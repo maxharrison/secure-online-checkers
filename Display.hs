@@ -26,6 +26,6 @@ displayBoard b = do
     let letters = [c | c <- ['A'..chr $ 64+size]]
     let string = concat [show n ++ " " ++ r ++ "\n" | (n, r) <- zip numbers rows]
                  ++ "  " ++ concat [[l, ' '] | l <- letters]
-    putStrLn string
+    putStrLn $ "\n" ++ string
 
 

@@ -2,34 +2,17 @@ module AI where
 
 import Valid (valid)
 import Types (Board, Player(..), Coordinate)
-import Utils (whosWon, piecesPlayer, pieces, startBoard, next, countPiece, countPlayer, king, test1Board)
+import Utils (whosWon, won, piecesPlayer, pieces, startBoard, next, countPiece, countPlayer, king, test1Board)
 import Move (move)
 import Display (displayBoard, showBoard)
-
-import Data.List (intercalate)
-
-import Data.Ord (comparing)
-import Data.List (sortBy)
-
-
-
-type Move = (Coordinate, Coordinate)
-
-
-data Tree a = Node a [Tree a]
-    deriving Show
-
-wins :: Board -> Player -> Bool
-wins b p = whosWon b == Just p
-
 
 
 
 
 minimax :: Tree ((Board, Move), Player) -> Tree ((Board, Move), Player)
 minimax (Node ((b, m), p) []) 
-   | wins b W  = Node ((b, m), W) []
-   | wins b B  = Node ((b, m), B) []
+   | won b W  = Node ((b, m), W) []
+   | won b B  = Node ((b, m), B) []
    | otherwise = Node ((b, m), E) []
 minimax (Node ((b, m), p) ts)
    | p == W = Node ((b, m), minimum ps) ts'
@@ -74,18 +57,9 @@ score :: Board -> Player -> Float
 score b p = (fromIntegral x) + ((fromIntegral y) / 2)
     where x = countPiece b p
           y = countPiece b (king p)
+          
 
-
-{- -- Returns the best move the player can do given the current board
-bestMove1 :: Board -> Player -> (Board, (Coordinate, Coordinate))
-bestMove1 b p = maximumScore $ moves b p
-   where
-      tree = prune depth $ gameTree b p
-
-
-maximumScore :: [(Board, (Coordinate, Coordinate))] -> (Board, (Coordinate, Coordinate))
-maximumScore xs = head $ sortBy (comparing $ score . fst) xs -}
-
+          
 play :: Board -> Player -> IO ()
 play b p = do
     let (b', (c1, c2)) = bestMove b p

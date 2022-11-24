@@ -1,6 +1,6 @@
 module Utils where
 
-import Types (Board, Row, Player(..), Coordinate)
+import Types (Board, Row, Player(..), Coordinate, Move)
 
 size :: Int
 size = 8
@@ -57,8 +57,11 @@ next :: Player -> Player
 next W = B 
 next B = W
 
-getCoordinatesBetween :: Coordinate -> Coordinate -> Coordinate
-getCoordinatesBetween (x1, y1) (x2, y2) = (x1 + (x2 - x1) `div` 2, y1 + (y2 - y1) `div` 2)
+getCoordinatesBetween :: Move -> Coordinate
+getCoordinatesBetween ((x1, y1), (x2, y2)) = (x1 + (x2 - x1) `div` 2, y1 + (y2 - y1) `div` 2)
 
-diagonalDistance :: Coordinate -> Coordinate -> Int
-diagonalDistance (x1, y1) (x2, y2) = abs (x1 - x2)
+diagonalDistance :: Move -> Int
+diagonalDistance ((x1, y1), (x2, y2)) = abs (x1 - x2)
+
+won :: Board -> Player -> Bool
+won b p = whosWon b == Just p

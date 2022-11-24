@@ -1,6 +1,6 @@
 module Move where
 
-import Types (Board, Coordinate, Player(..))
+import Types (Board, Coordinate, Player(..), Move)
 import Utils (piece, size, king, getCoordinatesBetween, diagonalDistance)
 
 
@@ -8,13 +8,13 @@ import Utils (piece, size, king, getCoordinatesBetween, diagonalDistance)
 change :: Int -> a -> [a] -> [a]
 change n x xs = [if i == n then x else x' | (x', i) <- zip xs [0..]]
 
-move :: Board -> (Coordinate, Coordinate) -> Board
-move b ((x1, y1), (x2, y2)) =
-    if diagonalDistance (x1, y1) (x2, y2) == 2
-        then jump     b ((x1, y1), (x2, y2))
-        else dontJump b ((x1, y1), (x2, y2))
+move :: Board -> Move -> Board
+move b m =
+    if diagonalDistance m == 2
+        then jump     b m
+        else dontJump b m
 
-dontJump :: Board -> (Coordinate, Coordinate) -> Board
+dontJump :: Board -> Move -> Board
 dontJump b ((x1, y1), (x2, y2)) =
     change y1 (change x1 E (b' !! y1)) b'
     where b' = change y2 (change x2 p' (b !! y2)) b
@@ -24,11 +24,11 @@ dontJump b ((x1, y1), (x2, y2)) =
                else p
 
 
-jump :: Board -> (Coordinate, Coordinate) -> Board
+jump :: Board -> Move -> Board
 jump b ((x1, y1), (x2, y2)) =
     change yb (change xb E (b' !! yb)) b'
     where b' = dontJump b ((x1, y1), (x2, y2))
-          (xb, yb) = getCoordinatesBetween (x1, y1) (x2, y2)
+          (xb, yb) = getCoordinatesBetween ((x1, y1), (x2, y2))
 
 
 otherEnd :: Player -> Coordinate -> Bool

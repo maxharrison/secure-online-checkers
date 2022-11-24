@@ -1,7 +1,7 @@
 module Input where
 
 import System.IO (hFlush, stdout)
-import Types (Coordinate)
+import Types (Coordinate, Move)
 import Parsers (Parser, parse, token, digit, letter)
 import Control.Applicative ((<|>))
 import Data.Char (isDigit, isLetter, digitToInt, toUpper, ord)
@@ -38,20 +38,14 @@ prompt s = do
    hFlush stdout
    getLine
 
-getCoordinates :: IO (Coordinate, Coordinate)
+getCoordinates :: IO (Move)
 getCoordinates = do
     input1 <- prompt "\nPlease enter the coordinates of the piece you would like to move"
     case coordinate input1 of
-        Nothing -> do
-            putStrLn "\nInvalid input"
-            (c1, c2) <- getCoordinates
-            return (c1, c2)
-        Just c1 -> do
-            input2 <- prompt "Please enter the destination coordinates"
-            case coordinate input2 of
-                Nothing -> do
-                    putStrLn "\nInvalid input"
-                    (c1, c2) <- getCoordinates
-                    return (c1, c2)
-                Just c2 -> do
-                    return (c1, c2)
+         Nothing -> do putStrLn "\nInvalid input"
+                       getCoordinates
+         Just c1 -> do input2 <- prompt "Please enter the destination coordinates"
+                       case coordinate input2 of
+                            Nothing -> do putStrLn "\nInvalid input"
+                                          getCoordinates
+                            Just c2 -> return (c1, c2)

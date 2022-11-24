@@ -10,22 +10,24 @@ import Move (move)
 
 
 
+
+
+
 play :: Board -> Player -> IO()
 play b p
     | whosWon b == Just B = do displayBoard b
-                               putStrLn "Player B wins"
+                               putStrLn "\nPlayer B wins!\n"
     | whosWon b == Just W = do displayBoard b
-        putStrLn "Player W wins"
-    | False = putStrLn "Draw!"
-    | otherwise = do
-        putStrLn $ "Player " ++ show (king p) ++ ":"
-        displayBoard b
-        (c1, c2) <- getCoordinates -- change (c1, c2) to m
-        if not $ valid b p c1 c2
-            then do putStrLn "Invalid move"
-                    play b p
-            else let b' = move b (c1, c2)
-                 in play b' (next p)
+                               putStrLn "\nPlayer W wins!\n"
+    | False = putStrLn "Draw!" -- TODO: Implement this
+    | otherwise = do putStrLn $ "Player " ++ show (king p) ++ ":"
+                     displayBoard b
+                     m <- getCoordinates
+                     if not $ valid b p m
+                         then do putStrLn "Invalid move"
+                                 play b p
+                         else let b' = move b m
+                              in play b' (next p)
 
 
 
@@ -68,4 +70,4 @@ pla2 b p | wins O b = putStrLn "Player O wins"
 
 
 main :: IO()
-main = play test1Board B
+main = play startBoard B
