@@ -94,4 +94,4 @@ play board player = do
                     putStrLn $ "Player " ++ (show winner) ++ " wins!"
 
 main :: IO()
-main = play test2 B
+main = play startBoard B

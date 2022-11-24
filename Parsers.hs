@@ -76,3 +76,17 @@ digit :: Parser Char
 digit = sat isDigit
 
 
+char :: Char -> Parser Char
+char x = sat (== x)
+
+string :: String -> Parser String
+string []     = return []
+string (x:xs) = do char x
+                   string xs
+                   return (x:xs)
+
+
+
+nat :: Parser Int
+nat = do xs <- some digit
+         return (read xs)
