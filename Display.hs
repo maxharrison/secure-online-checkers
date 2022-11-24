@@ -1,21 +1,31 @@
 module Display where
 
-import Types
-import Data.Char
+import Data.Char (chr)
+import Types (Board, Row, Player(..))
+import Utils (size)
 
-showPiece :: Piece -> Char
-showPiece Nothing         = '-'
-showPiece (Just (W, False)) = '♦'
-showPiece (Just (B, False)) = '♢'
-showPiece (Just (W, True))  = 'W'
-showPiece (Just (B, True))  = 'B'
+
+instance Show Player where
+ -- show :: Player -> String
+    show E  = "-"
+    show W  = "♦"
+    show WW = "W"
+    show B  = "♢"
+    show BB = "B"
 
 showRow :: Row -> String
-showRow r = concat [ [showPiece c, ' '] | c <- r]
+showRow r = concat [show p ++ " " | p <- r]
 
-showBoard ::Board -> Player -> IO ()
-showBoard b p = putStr ((concat grid) ++ letters)
-   where grid = f [show c ++ " " ++ r ++ "\n" |  c <- ([1..cols]),
-                                                 r <- [showRow (b !! (c-1))]]
-         letters = "  " ++ (concat [[c, ' '] | c <- ['A'..chr $ 64+rows]]) ++ "\n"
-         f = if p == B then id else reverse
+showBoard :: Board -> String
+showBoard b = concat [showRow r ++ "\n" | r <- b]
+
+displayBoard :: Board -> IO ()
+displayBoard b = do
+    let rows = lines $ showBoard b
+    let numbers = [n | n <- [1..size]]
+    let letters = [c | c <- ['A'..chr $ 64+size]]
+    let string = concat [show n ++ " " ++ r ++ "\n" | (n, r) <- zip numbers rows]
+                 ++ "  " ++ concat [[l, ' '] | l <- letters]
+    putStrLn string
+
+

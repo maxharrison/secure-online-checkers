@@ -1,80 +1,36 @@
 module Main where
 
-import Data.Char (isDigit, isLetter, digitToInt, toUpper, ord, chr)
-import ReadMove (coordinate)
-import Display
-import System.IO (hFlush, stdout)
-import Types
-import Move
-import Win
+import Types (Board, Player(..))
+import Utils (whosWon, startBoard, king, next, test1Board)
+import Display (displayBoard)
+import Input (getCoordinates)
+import Valid (valid)
+import Move (move)
 
 
 
-startBoard :: Board
-startBoard = [[Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False)],
-              [Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        ],
-              [Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False)],
-              [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-              [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-              [Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        ],
-              [Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False)],
-              [Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        ]]
-
-
-test :: Board
-test = [[Nothing        , Nothing        , Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False)],
-        [Just (B, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        ],
-        [Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False), Nothing        , Just (W, False)],
-        [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-        [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-        [Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        ],
-        [Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False)],
-        [Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        , Just (B, False), Nothing        ]]
-
-test2 :: Board
-test2 = [[Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Just (W, False), Nothing        , Just (W, False), Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Nothing        , Nothing        , Nothing        , Just (B, False), Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ],
-         [Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        , Nothing        ]]
-
-
-
-
-prompt :: String -> IO String
-prompt s = do
-   putStr $ s ++ ": "
-   hFlush stdout
-   getLine
-
-
-next :: Player -> Player
-next W = B 
-next B = W
-
-getCoordinates :: IO (Coordinate, Coordinate)
-getCoordinates = do
-    input1 <- prompt "\nPlease enter the coordinates of the piece you would like to move"
-    case coordinate input1 of
-        Nothing -> do
-            putStrLn "Invalid input"
-            (c1, c2) <- getCoordinates
-            return (c1, c2)
-        Just c1 -> do
-            input2 <- prompt "Please enter the destination coordinates"
-            case coordinate input2 of
-                Nothing -> do
-                    putStrLn "Invalid input"
-                    (c1, c2) <- getCoordinates
-                    return (c1, c2)
-                Just c2 -> do
-                    return (c1, c2)
 
 play :: Board -> Player -> IO()
-play board player = do
+play b p
+    | whosWon b == Just B = do displayBoard b
+                               putStrLn "Player B wins"
+    | whosWon b == Just W = do displayBoard b
+        putStrLn "Player W wins"
+    | False = putStrLn "Draw!"
+    | otherwise = do
+        putStrLn $ "Player " ++ show (king p) ++ ":"
+        displayBoard b
+        (c1, c2) <- getCoordinates -- change (c1, c2) to m
+        if not $ valid b p c1 c2
+            then do putStrLn "Invalid move"
+                    play b p
+            else let b' = move b (c1, c2)
+                 in play b' (next p)
+
+
+
+{- pla1 :: Board -> Player -> IO()
+pla1 board player = do
     showBoard board player
     (c1, c2) <- getCoordinates
     let piece = getPiece board c1
@@ -91,7 +47,25 @@ play board player = do
                     putStr "\n"
                     showBoard newBoard player
                     putStr "\n"
-                    putStrLn $ "Player " ++ (show winner) ++ " wins!"
+                    putStrLn $ "Player " ++ (show winner) ++ " wins!" -}
+
+
+{- pla2 :: Board -> Player -> IO()
+pla2 b p | wins O b = putStrLn "Player O wins"
+         | wins X b = putStrLn "Player X wins"
+         | full b = putStrLn "It is a draw"
+         | p == O = do
+              showBoard b
+              col <- getMove O
+              play (move O col b) X
+         | p == X = do
+              showBoard b
+              --col <- getMove X
+              --play (move X col b) O
+              putStrLn "Player X is thinking...\n"
+              play (bestMove b p) O
+         | otherwise = putStrLn "Error" -}
+
 
 main :: IO()
-main = play startBoard B
+main = play test1Board B
