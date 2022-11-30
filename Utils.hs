@@ -18,9 +18,29 @@ startBoard = [[E  , W  , E  , W  , E  , W  , E  , W  ],
 test1Board :: Board
 test1Board = [[E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , W  , E  , E  , E  ],
               [E  , E  , E  , B  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , W  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ]]
+
+winingTest :: Board
+winingTest = [[E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , W  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , B  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ]]
+
+kingTest__ :: Board
+kingTest__ = [[E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , B  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , W  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ]]
