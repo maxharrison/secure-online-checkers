@@ -8,6 +8,8 @@ import Input (getCoordinates)
 import Valid (valid)
 import Move (move)
 
+import AI
+
 
 
 
@@ -33,4 +35,4 @@ play b p
 
 
 main :: IO()
-main = play test1Board B
+main = mainAI --play test1Board B

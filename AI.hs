@@ -6,15 +6,25 @@ import Utils (whosWon, won, piecesPlayer, pieces, startBoard, next, countPiece, 
 import Utils (test1Board, winingTest, kingTest__)
 import Move (move)
 import Display (displayBoard, showBoard)
+import System.IO.Unsafe (unsafePerformIO)
+import System.Random (randomRIO)
+import Data.List (group)
+
+import Control.Monad (forM_)
+import System.Environment
+
+import Score
 
 
-minimax :: Tree (Board, Player, Move) -> Tree ((Board, Player, Move), Int)
-minimax (Node (b, p, m) []) =
-    (Node ((b, p, m), score b) [])
-minimax (Node (b, p, m) ts)
+
+
+minimax :: (Board -> Int) -> Tree (Board, Player, Move) -> Tree ((Board, Player, Move), Int)
+minimax sf (Node (b, p, m) []) =
+    (Node ((b, p, m), sf b) [])
+minimax sf (Node (b, p, m) ts)
     | p == W = Node ((b, p, m), minimum ss) ts'
     | p == B = Node ((b, p, m), maximum ss) ts'
-        where ts' = map minimax ts
+        where ts' = map (minimax sf) ts
               ss = [s | Node ((_, _, _), s) _ <- ts']
 
 
@@ -36,8 +46,6 @@ gameTree :: Board -> Player -> Move -> Tree (Board, Player, Move)
 gameTree b p m = Node (b, p, m) [gameTree b' (next p) m | (b', m) <- moves b p]
 
 
-depth :: Int
-depth = 4
 
 -- Returns a tree of the depth given
 prune :: Int -> Tree a -> Tree a
@@ -45,34 +53,69 @@ prune 0 (Node x _) = Node x []
 prune n (Node x ts) = Node x [prune (n-1) t | t <- ts]
 
 
-bestMove :: Board -> Player -> (Board, Player, Move)
-bestMove b p = head [bpm | Node (bpm, s) _ <- ts, s == best]
-    where tree = prune depth (gameTree b p em)
-          Node ((_, _, _), best) ts = minimax tree
+bestMove :: Int -> (Board -> Int) -> Board -> Player -> Maybe (Board, Player, Move)
+bestMove depth sf b p = if null moves then Nothing else Just (random moves)
+    where moves = [bpm | Node (bpm, s) _ <- ts, s == best]
+          tree = prune depth (gameTree b p em)
+          Node ((_, _, _), best) ts = minimax sf tree
           em = ((0, 0), (0, 0))
 
 
--- evaluation function
--- positive means B is winning, negative means W is winning
-score :: Board -> Int
-score b = ((xb*2) + yb) - ((xw*2) + yw)
-    where xb = countPiece b B
-          yb = countPiece b BB
-          xw = countPiece b W
-          yw = countPiece b WW
 
-          
-play :: Board -> Player -> IO ()
-play b p = do
-    let (b', p', (c1, c2)) = bestMove b p
-    putStrLn ""
-    putStrLn $ show p ++ " : " ++ show c1 ++ " -> " ++ show c2
-    displayBoard b'
-    play b' (next p)
+random :: [a] -> a
+random xs = xs !! unsafePerformIO (randomRIO (0, length xs - 1))
 
 
-main :: IO ()
-main = do
-    let board = startBoard
-    displayBoard board
-    play board W
+
+
+
+writeResults :: String -> Player -> Int -> IO ()
+writeResults fn E n = do
+    appendFile ("results/"++fn) $ "D:" ++ show n ++ "\n"
+writeResults fn p n = do
+    appendFile ("results/"++fn) $ show p ++ ":" ++ show n ++ "\n"
+
+
+
+-- first sf is W, second sf is B
+simulate :: Int -> Int -> String -> (Board -> Int) -> (Board -> Int) -> Board -> Player -> IO ()
+simulate _ 250 fn _ _ b p = 
+    if score_count b == 0 then writeResults fn (E) 250
+        else if score_count b > 0
+            then writeResults fn (king B) 250
+            else writeResults fn (king W) 250
+simulate depth n fn sf1 sf2 b p
+    | whosWon b == Just B = do displayBoard b
+                               writeResults fn (king B) n
+    | whosWon b == Just W = do displayBoard b
+                               writeResults fn (king W) n
+    | otherwise = do
+        let sf = if p == W then sf1 else sf2
+        case bestMove depth sf b p of
+            Nothing -> writeResults fn E n
+            Just (b', p', (c1, c2)) -> do
+                putStrLn ""
+                putStrLn $ show p ++ " : " ++ show c1 ++ " -> " ++ show c2
+                displayBoard b'
+                simulate depth (n+1) fn sf1 sf2 b' (next p)
+
+
+-- Returns number of wins for each function
+simulateWrite :: Int -> String -> Int -> (Board -> Int) -> (Board -> Int) -> Board -> IO ()
+simulateWrite depth fn n sf1 sf2 b = do
+    forM_ [1..(n`div`2)] $ \_ -> do
+        simulate depth 0 fn sf1 sf2 b W
+        simulate depth 0 fn sf1 sf2 b B
+    return ()
+
+
+
+
+
+
+
+mainAI :: IO ()
+mainAI = do
+    (w_sf:b_sf:depth:interations:_) <- getArgs
+    let fileName = "D:" ++ depth ++ "_W:" ++ w_sf ++ "_B:" ++ b_sf ++ ".txt"
+    simulateWrite (read depth) fileName (read interations) (chooseScoreFunction w_sf) (chooseScoreFunction b_sf) startBoard

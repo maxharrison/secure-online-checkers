@@ -10,7 +10,7 @@ startBoard = [[E  , W  , E  , W  , E  , W  , E  , W  ],
               [W  , E  , W  , E  , W  , E  , W  , E  ],
               [E  , W  , E  , W  , E  , W  , E  , W  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E , E  , E  , E  , E  , E  ],
               [B  , E  , B  , E  , B  , E  , B  , E  ],
               [E  , B  , E  , B  , E  , B  , E  , B  ],
               [B  , E  , B  , E  , B  , E  , B  , E  ]]
@@ -42,6 +42,16 @@ kingTest__ = [[E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ]]
+
+jumpTest__ :: Board
+jumpTest__ = [[E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , W  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , E  , E  , E  ],
+              [E  , E  , E  , E  , W  , E  , E  , E  ],
+              [E  , E  , E  , E  , E  , B  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ],
               [E  , E  , E  , E  , E  , E  , E  , E  ]]
 

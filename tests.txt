@@ -1,0 +1,62 @@
+
+
+./bin/ai score_count score_nothing 2 10
+{'score_count': 0.6, 'Draw': 0.4}
+./bin/ai score_count score_nothing 2 50
+{'score_count': 0.68, 'Draw': 0.32}
+./bin/ai score_count score_nothing 2 150
+{'score_count': 0.7066666666666667, 'Draw': 0.29333333333333333}
+
+./bin/ai score_count score_nothing 3 10
+{'score_count': 0.7, 'Draw': 0.3}
+./bin/ai score_count score_nothing 3 50
+{'score_count': 0.8, 'Draw': 0.2}
+./bin/ai score_count score_nothing 3 150
+{'score_count': 0.7666666666666667, 'Draw': 0.23333333333333334}
+
+./bin/ai score_count score_nothing 4 10
+{'score_count': 0.8, 'Draw': 0.2}
+./bin/ai score_count score_nothing 4 50
+{'score_count': 0.76, 'Draw': 0.24}
+./bin/ai score_count score_nothing 4 150
+{'score_count': 0.7666666666666667, 'Draw': 0.23333333333333334}
+
+./bin/ai score_count score_nothing 5 10
+{'score_count': 1.0}
+./bin/ai score_count score_nothing 5 50
+{'score_count': 0.9, 'Draw': 0.1}
+./bin/ai score_count score_nothing 5 150
+{'score_count': 0.88, 'Draw': 0.12}
+
+
+-------------------
+
+./bin/ai score_count score_nothing 2 10 &&
+{'score_count': 0.6, 'Draw': 0.4}
+./bin/ai score_count score_nothing 3 10 &&
+{'score_count': 0.7, 'Draw': 0.3}
+./bin/ai score_count score_nothing 4 10 &&
+{'score_count': 0.8, 'Draw': 0.2}
+./bin/ai score_count score_nothing 5 10
+{'score_count': 1.0}
+
+
+./bin/ai score_count score_nothing 2 50 &&
+{'score_count': 0.68, 'Draw': 0.32}
+./bin/ai score_count score_nothing 3 50 &&
+{'score_count': 0.8, 'Draw': 0.2}
+./bin/ai score_count score_nothing 4 50 &&
+{'score_count': 0.76, 'Draw': 0.24}
+./bin/ai score_count score_nothing 5 50
+{'score_count': 0.9, 'Draw': 0.1}
+
+
+./bin/ai score_count score_nothing 2 150 &&
+{'score_count': 0.7066666666666667, 'Draw': 0.29333333333333333}
+./bin/ai score_count score_nothing 3 150 &&
+{'score_count': 0.7666666666666667, 'Draw': 0.23333333333333334}
+./bin/ai score_count score_nothing 4 150 &&
+{'score_count': 0.7666666666666667, 'Draw': 0.23333333333333334}
+./bin/ai score_count score_nothing 5 150
+{'score_count': 0.88, 'Draw': 0.12}
+

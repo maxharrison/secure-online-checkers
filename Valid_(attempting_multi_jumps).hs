@@ -59,6 +59,36 @@ canJump b p m =
     isPieceBetweenOtherPlayer b p m) 
 
 
+--canMultipleJump :: Board -> Player -> Move -> Bool
+--canMultipleJump board player (origin, destination) =
+--    let possibleJumps = getPossibleJumps ----
+--    in isReachable destination jumps
+
+
+
+
+-- HELP FROM https://stackoverflow.com/questions/37511246/haskell-checkers-how-to-write-a-function-that-returns-a-list-of-possible-jumps
+singleJumps :: Player -> Coordinate -> Board -> [(Coordinate, Board)]
+singleJumps p (x, y) b = [(destination, b') | destination <- [(x+2, y+2), (x+2, y-2), (x-2, y+2), (x-2, y-2)], 
+                                        isPieceBetweenOtherPlayer b p ((x, y), destination),
+                                        b' <- [jump b ((x, y), destination)]]
+
+-- HELP FROM https://stackoverflow.com/questions/37511246/haskell-checkers-how-to-write-a-function-that-returns-a-list-of-possible-jumps
+multiJumps :: Player -> Coordinate -> Board -> [([Coordinate], Board)]
+{- 
+as list comphehension
+for each possible single jump (rc, b):
+  for each possible multi jump (path, b') starting from (rc,b):
+    return the path (rc:path) and ending board configuration b'
+-}
+multiJumps p origin b = [([dst] ++ dsts, b'') | (dst, b')   <- singleJumps p origin b,
+                                                (dsts, b'') <- multiJumps p dst    b']
+
+
+
+
+--
+---------------------------------------
 
 valid :: Board -> Player -> Move -> Bool
 valid b p (c1, c2) =
