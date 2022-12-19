@@ -76,7 +76,6 @@ singleJumps p (x, y) b = [(destination, b') | destination <- [(x+2, y+2), (x+2, 
 -- HELP FROM https://stackoverflow.com/questions/37511246/haskell-checkers-how-to-write-a-function-that-returns-a-list-of-possible-jumps
 multiJumps :: Player -> Coordinate -> Board -> [([Coordinate], Board)]
 {- 
-as list comphehension
 for each possible single jump (rc, b):
   for each possible multi jump (path, b') starting from (rc,b):
     return the path (rc:path) and ending board configuration b'

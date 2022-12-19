@@ -10,6 +10,9 @@ chooseScoreFunction "score_nothing" = score_nothing
 chooseScoreFunction "score_count" = score_count
 chooseScoreFunction "score_distance" = score_distance
 chooseScoreFunction "score_win" = score_win
+chooseScoreFunction "score_count_basic" = score_count_basic
+chooseScoreFunction _ = score_nothing
+
 
 
 
@@ -26,6 +29,13 @@ score_win b = case whosWon b of
 
 score_count :: Board -> Int
 score_count b = (bp + (bk * 2)) - (wp + (wk * 2))
+    where bp = countPiece b B
+          bk = countPiece b BB
+          wp = countPiece b W
+          wk = countPiece b WW
+
+score_count_basic :: Board -> Int
+score_count_basic b = (bp + bk) - (wp + wk)
     where bp = countPiece b B
           bk = countPiece b BB
           wp = countPiece b W

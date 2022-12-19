@@ -8,11 +8,13 @@ import Utils (piece, size, king, getCoordinatesBetween, diagonalDistance)
 change :: Int -> a -> [a] -> [a]
 change n x xs = [if i == n then x else x' | (x', i) <- zip xs [0..]]
 
+
 move :: Board -> Move -> Board
 move b m =
     if diagonalDistance m == 2
         then jump     b m
         else dontJump b m
+
 
 dontJump :: Board -> Move -> Board
 dontJump b ((x1, y1), (x2, y2)) =

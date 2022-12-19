@@ -1,4 +1,4 @@
-module AI where
+module AI_Tests where
 
 import Valid (valid)
 import Types (Board, Player(..), Coordinate, Move, Tree(..))
@@ -111,11 +111,12 @@ simulateWrite depth fn n sf1 sf2 b = do
 
 
 
-
-
-
-mainAI :: IO ()
-mainAI = do
+main2 :: IO ()
+main2 = do
     (w_sf:b_sf:depth:interations:_) <- getArgs
+    --let w_sf = "score_nothing"
+    --let b_sf = "score_count_basic"
+    --let depth = "1"
+    --let interations = "2"
     let fileName = "D:" ++ depth ++ "_W:" ++ w_sf ++ "_B:" ++ b_sf ++ ".txt"
     simulateWrite (read depth) fileName (read interations) (chooseScoreFunction w_sf) (chooseScoreFunction b_sf) startBoard

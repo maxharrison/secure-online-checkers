@@ -38,7 +38,6 @@ instance Alternative Parser where
                            rs -> rs)
 
 
-
 -- discard any leading spaces
 space :: Parser ()
 space = do
@@ -62,15 +61,16 @@ sat p = do
     then return x
     else empty
 
+
 item :: Parser Char
 item = P (\inp -> case inp of
     []     -> []
     (x:xs) -> [(x,xs)])
 
 
-
 letter :: Parser Char
 letter = sat isLetter
+
 
 digit :: Parser Char
 digit = sat isDigit
@@ -79,12 +79,12 @@ digit = sat isDigit
 char :: Char -> Parser Char
 char x = sat (== x)
 
+
 string :: String -> Parser String
 string []     = return []
 string (x:xs) = do char x
                    string xs
                    return (x:xs)
-
 
 
 nat :: Parser Int

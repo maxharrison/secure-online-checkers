@@ -7,13 +7,9 @@ import Display (displayBoard)
 import Input (getCoordinates)
 import Valid (valid)
 import Move (move)
+import AI (playAI)
 
-import AI
-
-
-
-
-
+import AI_Tests
 
 
 play :: Board -> Player -> IO()
@@ -22,7 +18,6 @@ play b p
                                putStrLn "\nPlayer B wins!\n"
     | whosWon b == Just W = do displayBoard b
                                putStrLn "\nPlayer W wins!\n"
-    -- | False = putStrLn "Draw!"  -- TODO: Implement this
     | otherwise = do putStrLn $ "\nPlayer " ++ show (king p) ++ ":"
                      displayBoard b
                      m <- getCoordinates
@@ -33,6 +28,14 @@ play b p
                               in play b' (next p)
 
 
-
 main :: IO()
-main = mainAI --play test1Board B
+main = do
+    main2
+{-     putStrLn "\nEnter 'A' to play against an AI, or enter 'B' to play a two player game.\n"
+    input <- getLine
+    case input of
+        "A" -> playAI startBoard W
+        "B" -> play startBoard W
+        _   -> do putStrLn "\nInvalid input"
+                  main -}
+
