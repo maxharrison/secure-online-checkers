@@ -1,41 +1,53 @@
 module Main where
 
-import Types (Board, Player(..))
-import Utils (whosWon, king, next)
-import Utils (startBoard, test1Board, winingTest, kingTest__)
-import Display (displayBoard)
-import Input (getCoordinates)
-import Valid (valid)
-import Move (move)
-import AI (playAI)
+-- Haskell modules
+import Data.Char (chr)
 
-import AI_Tests
-
-
-play :: Board -> Player -> IO()
-play b p
-    | whosWon b == Just B = do displayBoard b
-                               putStrLn "\nPlayer B wins!\n"
-    | whosWon b == Just W = do displayBoard b
-                               putStrLn "\nPlayer W wins!\n"
-    | otherwise = do putStrLn $ "\nPlayer " ++ show (king p) ++ ":"
-                     displayBoard b
-                     m <- getCoordinates
-                     if not $ valid b p m
-                         then do putStrLn "Invalid move"
-                                 play b p
-                         else let b' = move b m
-                              in play b' (next p)
+-- My modules
+import State
+import GameState
+import Input
+import Utils
+import Display
+import Valid
 
 
-main :: IO()
+
+
+
+
+playMove :: STIO GameState ()
+playMove = do
+    routes <- valid_routes (2, 5)
+    route <- lift $ getRoute
+    if route `elem` routes
+        then makeMove route
+        else do lift $ putStrLn "Invalid move"
+                playMove
+
+
+
+-- TODO: Include the AI code from the earlier version
+play :: STIO GameState ()
+play = do
+    result <- whosWon
+    case result of
+        Just player -> do
+            displayBoard
+            lift $ putStrLn $ "Player " ++ (show player) ++ " wins!"
+        Nothing -> do -- if the game has not ended
+            displayBoard
+            playMove
+            nextPlayer
+            play
+
+
+
+main :: IO ()
 main = do
-    main2
-{-     putStrLn "\nEnter 'A' to play against an AI, or enter 'B' to play a two player game.\n"
-    input <- getLine
-    case input of
-        "A" -> playAI startBoard W
-        "B" -> play startBoard W
-        _   -> do putStrLn "\nInvalid input"
-                  main -}
+    (_, gameState) <- app play (GameState testBoard White 0)
+    putStrLn "Game Finished"
+
+
+
 
