@@ -1,97 +1,70 @@
 module Utils where
 
-import Types (Board, Row, Player(..), Coordinate, Move)
+-- Haskell modules
 
-size :: Int
-size = 8
+-- My modules
+import GameState
+import State
 
-startBoard :: Board
-startBoard = [[E  , W  , E  , W  , E  , W  , E  , W  ],
-              [W  , E  , W  , E  , W  , E  , W  , E  ],
-              [E  , W  , E  , W  , E  , W  , E  , W  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E , E  , E  , E  , E  , E  ],
-              [B  , E  , B  , E  , B  , E  , B  , E  ],
-              [E  , B  , E  , B  , E  , B  , E  , B  ],
-              [B  , E  , B  , E  , B  , E  , B  , E  ]]
 
-test1Board :: Board
-test1Board = [[E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , B  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , W  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ]]
 
-winingTest :: Board
-winingTest = [[E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , W  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , B  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ]]
 
-kingTest__ :: Board
-kingTest__ = [[E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , B  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , W  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ]]
+getCaptured :: [Position] -> [Position]
+getCaptured [] = []
+getCaptured [_] = []
+getCaptured (p1:p2:positions) = 
+    if isDistance p1 p2 2
+        then (getMiddlePosition p1 p2) : getCaptured (p2:positions)
+        else getCaptured (p2:positions)
 
-jumpTest__ :: Board
-jumpTest__ = [[E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , W  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , W  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , B  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ],
-              [E  , E  , E  , E  , E  , E  , E  , E  ]]
 
-piecesPlayer :: Board -> Player -> [Coordinate]
-piecesPlayer b p = (pieces b p) ++ (pieces b $ king p)
+isDistance :: Position -> Position -> Int -> Bool
+isDistance (x1, y1) (x2, y2) n =
+    abs(x2-x1) == n && abs(y2-y1) == n
 
-pieces :: Board -> Player -> [Coordinate]
-pieces b p = [(x, y) |
-              (r, y) <- zip b [0..],
-              (p', x) <- zip r [0..],
-              p' == p] 
 
-king :: Player -> Player
-king W = WW
-king B = BB
-king p = p
+getMiddlePosition :: Position -> Position -> Position
+getMiddlePosition (x1, y1) (x2, y2) =
+    (x1 + (x2-x1) `div` 2, y1 + (y2-y1) `div` 2)
 
-countPlayer :: Board -> Player -> Int
-countPlayer b p = length $ piecesPlayer b p
 
-countPiece :: Board -> Player -> Int
-countPiece b p = length $ pieces b p
 
-whosWon :: Board -> Maybe Player
-whosWon b | countPlayer b W == 0 = Just B
-          | countPlayer b B == 0 = Just W
-          | otherwise            = Nothing
+-- only checks whether the origin is not empty
+makeMove :: Route -> STIO GameState ()
+makeMove route = do
+    let origin = head route
+    let destination = last route
+    originPiece <- getPiece origin
+    case originPiece of
+        Just (player, pieceType) -> do
+            insertPiece destination (player, pieceType)
+            --deletePiece origin
+            let captured = getCaptured route
+            deletePieces (origin:captured)
+            -- get pieces between all the jumps and delete them
+        Nothing -> return ()
 
-piece :: Board -> Coordinate -> Player
-piece b (x, y) = b !! y !! x
 
-next :: Player -> Player
-next W = B 
-next B = W
+countPlayerPieces :: Player -> STIO GameState Int
+countPlayerPieces player = do
+    allPieces <- getAllPieces
+    return $ length $ (filter (\(_, (p, _)) -> p == player)) allPieces
 
-getCoordinatesBetween :: Move -> Coordinate
-getCoordinatesBetween ((x1, y1), (x2, y2)) = (x1 + (x2 - x1) `div` 2, y1 + (y2 - y1) `div` 2)
 
-diagonalDistance :: Move -> Int
-diagonalDistance ((x1, y1), (x2, y2)) = abs (x1 - x2)
+whosWon :: STIO GameState (Maybe Player)
+whosWon = do
+    -- TODO: also should check whether a player can make any moves
+    whitePieces <- countPlayerPieces White
+    blackPieces <- countPlayerPieces Black
+    case (whitePieces, blackPieces) of
+        (0, 0) -> return Nothing
+        (0, _) -> return $ Just Black
+        (_, 0) -> return $ Just White
+        _      -> return Nothing
 
-won :: Board -> Player -> Bool
-won b p = whosWon b == Just p
+nextPlayer :: STIO GameState ()
+nextPlayer = do
+    player <- getCurrentPlayer
+    case player of
+        White -> setCurrentPlayer Black
+        Black -> setCurrentPlayer White

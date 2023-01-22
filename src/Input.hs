@@ -1,56 +1,58 @@
 module Input where
 
+-- Haskell modules
 import System.IO (hFlush, stdout)
-import Types (Coordinate, Move)
-import Parsers (Parser, parse, token, digit, letter)
 import Control.Applicative ((<|>))
 import Data.Char (isDigit, isLetter, digitToInt, toUpper, ord)
+
+-- My modules
+import GameState
+import Parsers
 
 
 charToInt :: Char -> Int
 charToInt c = (ord $ toUpper c) - 65
 
-
 digToInt :: Char -> Int
 digToInt c = (digitToInt c) - 1
 
+digitLetterParser :: Parser (Int, Int)
+digitLetterParser = do
+    d <- (token digit)
+    l <- (token letter)
+    return (charToInt l, digToInt d)
 
-digitLetter :: Parser (Int, Int)
-digitLetter = do
-  d <- (token digit)
-  l <- (token letter)
-  return (charToInt l, digToInt d)
+letterDigitParser :: Parser (Int, Int)
+letterDigitParser = do
+    l <- (token letter)
+    d <- (token digit)
+    return (charToInt l, digToInt d)
 
+positionParser :: Parser Position
+positionParser = do
+    (l, d) <- (digitLetterParser <|> letterDigitParser)
+    return (l, d)
 
-letterDigit :: Parser (Int, Int)
-letterDigit = do
-  l <- (token letter)
-  d <- (token digit)
-  return (charToInt l, digToInt d)
+routeParser :: Parser [Position]
+routeParser = do
+    positions <- someSeperator positionParser ","
+    return positions
 
-
-coordinate :: String -> Maybe Coordinate
-coordinate s = let result = parse (letterDigit <|> digitLetter) s
-               in case result of
-                    [] -> Nothing
-                    (((l, d),_):_) -> Just (l,  d)
-
-
-prompt :: String -> IO String
-prompt s = do
-   putStr $ s ++ ": "
+promptUser :: String -> IO String
+promptUser s = do
+   putStrLn $ s ++ ":"
    hFlush stdout
    getLine
 
+getRoute :: IO Route
+getRoute = do
+    input <- promptUser "\nPlease enter the move you would like to make (a list of coordinates separated by commas)"
+    case parse routeParser input of
+         [] -> do putStrLn "\nInvalid input"
+                  getRoute
+         ((route,_):_) -> do
+            if length route < 2
+                then do putStrLn "\nYou have to enter more than one coordinate"
+                        getRoute
+                else return route
 
-getCoordinates :: IO (Move)
-getCoordinates = do
-    input1 <- prompt "\nPlease enter the coordinates of the piece you would like to move"
-    case coordinate input1 of
-         Nothing -> do putStrLn "\nInvalid input"
-                       getCoordinates
-         Just c1 -> do input2 <- prompt "Please enter the destination coordinates"
-                       case coordinate input2 of
-                            Nothing -> do putStrLn "\nInvalid input"
-                                          getCoordinates
-                            Just c2 -> return (c1, c2)
