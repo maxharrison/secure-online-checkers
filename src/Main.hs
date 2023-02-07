@@ -16,11 +16,13 @@ import Valid
 
 
 
+
+
 playMove :: STIO GameState ()
 playMove = do
-    routes <- valid_routes (2, 5)
     route <- lift $ getRoute
-    if route `elem` routes
+    validMove <- valid route
+    if validMove
         then makeMove route
         else do lift $ putStrLn "Invalid move"
                 playMove

@@ -10,7 +10,7 @@ import State
 
 
 testBoard :: Board
-testBoard = Map.fromList([((2, 5), (White, King)), ((3, 4), (Black, Pawn)), ((5, 2), (Black, Pawn))])
+testBoard = Map.fromList([((1, 1), (White, Pawn)),((2, 5), (White, King)), ((3, 4), (Black, Pawn)), ((5, 2), (Black, Pawn))])
 
 startBoard :: Board
 startBoard = Map.fromList([
