@@ -2,62 +2,129 @@ module Valid where
 
 -- Haskell modules
 import qualified Data.Map as Map
+import Data.Maybe
 import Debug.Trace
+
 
 -- My modules
 import GameState
-import Utils
-import State
+
 
 
 
 --------------------------------------------------------------------------------
---                           Validation Functions                             --
+--                           Validation Function                              --
 --------------------------------------------------------------------------------
 
-valid :: Route -> STIO GameState Bool
-valid route = do
-    board <- getBoard
-    currentPlayer <- getCurrentPlayer
-    return $ validRoute True board currentPlayer route
+single x = [x]
 
--- is this the first move in the route
+
+-- Returns the longest route
+longest :: [[a]] -> [[a]]
+longest xs = let max = maximum $ map length xs
+             in filter (\x -> length x == max) xs
+
+
+
+getAllValidBoardsRoutes :: Board -> Player -> [(Board, Route)]
+getAllValidBoardsRoutes board player
+    | won board /= Nothing = []
+    | otherwise = map (\r ->
+        case validRoute True board player r of
+            Just board' -> (board', r)
+            Nothing -> error "This should never happen"
+        ) $ validRoutes board player
+
+
+
+
+validRoutes :: Board -> Player -> [(Route)]
+validRoutes board player =
+    let originRoutes = map single $
+            (Map.keys . Map.filter (\(p, _) -> p == player)) board
+        routes = concatMap (generateValidRoute board player) originRoutes
+    in longest routes
+    
+
+generateValidRoute :: Board -> Player -> Route -> [(Route)]
+generateValidRoute board player route =
+    let routes = [route ++ [destination] | destination <- getAllPositions]
+        validRoutes = mapMaybe (\r ->
+            case validRoute True board player r of
+                Just board' -> Just (r)
+                Nothing -> Nothing) routes
+        
+
+
+            --case validRoute True board player r of
+            --    Just board' -> Just (r)
+            --    Nothing -> Nothing) routes
+
+    in if length validRoutes > 0
+        then concatMap (generateValidRoute board player) validRoutes
+        else if length route > 1
+                then [route]
+                else []
+
+
+
+
+
+
 type IsFirstMove = Bool
 
-validRoute :: IsFirstMove -> Board -> Player -> Route -> Bool
-validRoute isFirstMove board player route =
-    let (origin:destination:remainingRoute) = route
-        isDistance2 = diagonalDistance origin destination == 2
-
-    in validOwnPiece board player origin
-
-    && validPositionEmpty board destination
-
-    && validMovingCorrectly board origin destination
-
-    && validCorrectDistance isFirstMove origin destination
-
-    && validJump isDistance2 board player origin destination
-
-
-    && (if null remainingRoute
-            then True
-            else let Just originPiece = Map.lookup origin board
-                     board2 = deleteBoard board origin
-                     board3 = insertBoard board2 destination originPiece
-                     board4 = if isDistance2
-                        then deleteBoard board3 (getMiddle origin destination)
-                        else board3
-                 in validRoute False board4 player (destination:remainingRoute))
+validRoute :: IsFirstMove -> Board -> Player -> Route -> Maybe (Board)
+validRoute isFirstMove board player (origin:destination:route) =
+    let isDistance2 = diagonalDistance origin destination == 2
+        middle = getMiddle origin destination
+        validBasic = validOwnPiece board player origin
+                  && validInBounds origin destination
+                  && validPositionEmpty board destination
+                  && validMovingCorrectly board origin destination
+                  && validCorrectDistance isFirstMove origin destination
+                  && validJump isDistance2 board player middle
+        newBoard = let Just originPiece = Map.lookup origin board
+                       board' = (Map.delete origin . Map.insert destination originPiece) board
+                   in if isDistance2 then Map.delete middle board' else board'
+        
+    in case (isDistance2, validBasic) of
+            (_, False) -> Nothing -- NOT VALID
+            (False, _) -> if null route
+                                then return newBoard
+                                else Nothing
+            (True, _)  -> if null route
+                                then return newBoard
+                                else validRoute False newBoard player (destination:route)
 
 
-
+validRoute2 :: IsFirstMove -> Board -> Player -> Route -> Maybe (Board)
+validRoute2 isFirstMove board player (origin:destination:route) =
+    let isDistance2 = diagonalDistance origin destination == 2
+        middle = getMiddle origin destination
+    in if (validOwnPiece board player origin
+        && validInBounds origin destination
+        && validPositionEmpty board destination
+        && validMovingCorrectly board origin destination
+        && validCorrectDistance isFirstMove origin destination
+         && validJump isDistance2 board player middle)
+            then let Just originPiece = Map.lookup origin board
+                     board' = (Map.delete origin . Map.insert destination originPiece) board
+                     board'' = if isDistance2 then Map.delete middle board' else board'
+                 in if null route
+                        then return board''
+                        else validRoute2 False board'' player (destination:route)
+            else Nothing
 
 
 --------------------------------------------------------------------------------
 --                        Validation Helper Functions                         --
 --------------------------------------------------------------------------------
 
+
+validInBounds :: Position -> Position -> Bool
+validInBounds (xo, yo) (xd, yd) =
+    xo >= 0 && xo < size && yo >= 0 && yo < size &&
+    xd >= 0 && xd < size && yd >= 0 && yd < size
 
 -- checks if the player is moving their own piece
 validOwnPiece :: Board -> Player -> Position -> Bool
@@ -74,22 +141,21 @@ validPositionEmpty board position =
 -- if this is the first move in the route then it can make
 -- single distance moves
 validCorrectDistance :: IsFirstMove -> Position -> Position -> Bool
-validCorrectDistance isFirstMove origin destination =
-    if isFirstMove
-        then (diagonalDistance origin destination == 1 ||
-              diagonalDistance origin destination == 2)
-        else diagonalDistance origin destination == 2
+validCorrectDistance isFirstMove origin destination
+    | isFirstMove = (diagonalDistance origin destination == 1 ||
+                     diagonalDistance origin destination == 2)
+    | otherwise = diagonalDistance origin destination == 2
+
 
 -- if the user is jumping then is the position in the
 -- middle an oppponent piece
-validJump :: Bool -> Board -> Player -> Position -> Position -> Bool
-validJump isDistance2 board player origin destination =
-    if not isDistance2
-        then True
-        else let middle = getMiddle origin destination
-             in case Map.lookup middle board of
-                    Just (p, _) -> p == next player
-                    _           -> False
+validJump :: Bool -> Board -> Player -> Position -> Bool
+validJump isDistance2 board player middle
+    | isDistance2 = case Map.lookup middle board of
+        Just (p, _) -> p == next player
+        _           -> False
+    | otherwise = True
+
 
 validMovingCorrectly :: Board -> Position -> Position -> Bool
 validMovingCorrectly board (xo, yo) (xd, yd) =
@@ -111,7 +177,6 @@ validMovingCorrectly board (xo, yo) (xd, yd) =
 diagonalDistance :: Position -> Position -> Int
 diagonalDistance (x1, y1) (x2, y2) = max (abs (x1 - x2)) (abs (y1 - y2))
 
-
 getMiddle :: Position -> Position -> Position
 getMiddle (yOrigin, xOrigin) (yDestination, xDestination) =
     let yMiddle = (yOrigin + yDestination) `div` 2
@@ -122,10 +187,15 @@ next :: Player -> Player
 next White = Black
 next Black = White
 
+won :: Board -> Maybe Player
+won board =
+    let whitePieces = countPlayerPieces board White
+        blackPieces = countPlayerPieces board Black
+    in case (whitePieces, blackPieces) of
+        (0, _) -> Just Black
+        (_, 0) -> Just White
+        _      -> Nothing
 
-insertBoard :: Board -> Position -> (Player, PieceType) -> Board
-insertBoard board position piece =
-    Map.insert position piece board
-
-deleteBoard :: Board -> Position -> Board
-deleteBoard board position = Map.delete position board
+countPlayerPieces :: Board -> Player -> Int
+countPlayerPieces board player =
+    length $ (filter (\(_, (p, _)) -> p == player)) $ Map.toList board

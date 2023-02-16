@@ -27,7 +27,6 @@ data GameState = GameState {
   moveNumber    :: Integer
 }
 
---type Move = [Position]
 type Route = [Position]
 
 getBoard :: STIO GameState Board

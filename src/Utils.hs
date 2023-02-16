@@ -9,27 +9,8 @@ import State
 
 
 
-getCaptured :: [Position] -> [Position]
-getCaptured [] = []
-getCaptured [_] = []
-getCaptured (p1:p2:positions) = 
-    if isDistance p1 p2 2
-        then (getMiddlePosition p1 p2) : getCaptured (p2:positions)
-        else getCaptured (p2:positions)
 
-
-isDistance :: Position -> Position -> Int -> Bool
-isDistance (x1, y1) (x2, y2) n =
-    abs(x2-x1) == n && abs(y2-y1) == n
-
-
-getMiddlePosition :: Position -> Position -> Position
-getMiddlePosition (x1, y1) (x2, y2) =
-    (x1 + (x2-x1) `div` 2, y1 + (y2-y1) `div` 2)
-
-
-
--- only checks whether the origin is not empty
+{- -- only checks whether the origin is not empty
 makeMove :: Route -> STIO GameState ()
 makeMove route = do
     let origin = head route
@@ -42,7 +23,7 @@ makeMove route = do
             let captured = getCaptured route
             deletePieces (origin:captured)
             -- get pieces between all the jumps and delete them
-        Nothing -> return ()
+        Nothing -> return () -}
 
 
 countPlayerPieces :: Player -> STIO GameState Int
