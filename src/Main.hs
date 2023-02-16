@@ -1,53 +1,50 @@
+{-# language OverloadedStrings #-}
 module Main where
 
--- Haskell modules
-import Data.Char (chr)
-
--- My modules
-import State
-import GameState
-import Input
-import Utils
-import Display
-import Valid
+import qualified Web.Scotty as S
+import Control.Monad.IO.Class (liftIO)
+import qualified Control.Concurrent.MVar as MV
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Char8 as C8BS
 
 
 
+-- run instructions in README.md
 
 
 
-playMove :: STIO GameState ()
-playMove = do
-    routes <- valid_routes (2, 5)
-    route <- lift $ getRoute
-    if route `elem` routes
-        then makeMove route
-        else do lift $ putStrLn "Invalid move"
-                playMove
+data State = State {
+    sCounter :: Int }
 
 
-
--- TODO: Include the AI code from the earlier version
-play :: STIO GameState ()
-play = do
-    result <- whosWon
-    case result of
-        Just player -> do
-            displayBoard
-            lift $ putStrLn $ "Player " ++ (show player) ++ " wins!"
-        Nothing -> do -- if the game has not ended
-            displayBoard
-            playMove
-            nextPlayer
-            play
 
 
 
 main :: IO ()
 main = do
-    (_, gameState) <- app play (GameState testBoard White 0)
-    putStrLn "Game Finished"
 
+  -- initialise the state mvar
+  stateVar <- MV.newMVar State {
+    sCounter = 0 }
 
+  -- start the web server
+  S.scotty 3000 $ do
 
+    -- curl localhost:3000/poll
+    S.get "/poll" $ do
+      S.setHeader "Content-Type" "application/octet-stream" -- Set the content type to indicate binary data
+      S.raw $ LBS.fromStrict $ C8BS.pack ("poll\n")
+
+    -- curl -X POST -H "Content-Type: application/octet-stream" --data-binary $'hello' localhost:3000/binary
+    S.post "/binary" $ do
+      body <- S.body
+      liftIO $ putStrLn $ "body: " ++ show body
+
+      counter <- liftIO $ sCounter <$> MV.takeMVar stateVar
+      liftIO $ MV.putMVar stateVar State {
+        sCounter = counter + 1 }
+
+      S.setHeader "Content-Type" "application/octet-stream" -- Set the content type to indicate binary data
+      S.raw $ LBS.fromStrict $ C8BS.pack (show counter ++ "\n")
+    
 
