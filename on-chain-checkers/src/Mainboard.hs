@@ -10,6 +10,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Control.Concurrent.STM as STM
 
 
+--https://github.com/soupi/learn-scotty-bulletin-app
 
 
 data Post
