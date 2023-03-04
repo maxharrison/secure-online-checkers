@@ -163,12 +163,6 @@ class Checkers:
     text_rect.center = (x + self.square_size // 2, y + self.square_size // 2)
     self.game_display.blit(text_surface, text_rect)
 
-
-
-
-
-
-
   def get_square(self, mouse_pos):
     x, y = mouse_pos
     row = y // self.square_size
@@ -178,7 +172,8 @@ class Checkers:
   def download_board(self):
     try:
       r = requests.post('http://localhost:3000/binary', data=f'poll')
-      board = self.parse_board(r.text)
+      plaintext = decryptDES(r.text)
+      board = self.parse_board(plaintext)
       return board
     except requests.exceptions.ConnectionError:
       print('Error: could not connect to server')
@@ -194,7 +189,17 @@ class Checkers:
     self.board = board if board != self.board else self.board
 
 
-
+def decryptDES(data : str):
+  from Crypto.Cipher import DES
+  from Crypto.Util.Padding import unpad
+  from Crypto.Util import Counter
+  ciphertext = int(data, 2)
+  bytes = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, 'big')
+  key = b'iwrsnfhl'
+  ctr = Counter.new(64, prefix=b'', initial_value=0)
+  cipher = DES.new(key, DES.MODE_CTR, counter=ctr)
+  decrypted = unpad(cipher.decrypt(bytes), DES.block_size)
+  return decrypted.decode('utf-8')
 
 
     

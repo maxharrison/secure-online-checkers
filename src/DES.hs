@@ -3,7 +3,9 @@ module DES where
 import Binary
 import Debug.Trace
 
+
 type Key = Binary
+type Nonce = Binary
 
 
 
@@ -17,7 +19,7 @@ plaintextTest = map (\i -> if i==1 then True else False)
    0, 1, 1, 1, 0, 1, 1, 1,
    1, 0, 0, 0, 1, 0, 0, 0]
 
-key = map (\i -> if i==1 then True else False)
+keyTest = map (\i -> if i==1 then True else False)
   [0, 1, 1, 1, 0, 1, 0, 1,
    0, 0, 1, 0, 1, 0, 0, 0,
    0, 1, 1, 1, 1, 0, 0, 0,
@@ -36,44 +38,58 @@ targetTest = map (\i -> if i==1 then True else False)
    1, 0, 1, 0, 0, 1, 1, 1,
    0, 1, 0, 0, 1, 0, 0, 1,
    1, 0, 0, 1, 1, 1, 0, 1]
-
+{- 
 
 main = do
-  let plaintext = plaintextTest
-  let ciphertext = encrypt key plaintext
-  let decrypted = decrypt key ciphertext
-  putStrLn $ "plaintext:    " ++ showBinary plaintext
-  putStrLn $ "ciphertext:   " ++ showBinary ciphertext
-  putStrLn $ "decrypted:    " ++ showBinary decrypted
+  let plaintext = stringToBinary "abcdefg"
+
+  let key = stringToBinary "secretke"
+
+  let nonce = replicate 32 False
+
+  let ciphertext = encrypt key nonce plaintext
+
+  putStrLn $ showBinary $ plaintext
+  putStrLn $ showBinary $ ciphertext
+  putStrLn $ binaryToString $ decrypt key nonce ciphertext
 
 
+ -}
+encrypt :: Key -> Nonce -> Binary -> Binary
+encrypt key nonce binary = (ctrMode des key nonce . padPKCS7) binary
+
+decrypt :: Key -> Nonce -> Binary -> Binary
+decrypt key nonce binary = (depadPKCS7 . ctrMode des key nonce) binary
+
+
+------------------------------------------------------------------
+--                    Counter Mode Functions                    --
+------------------------------------------------------------------
+
+
+ctrMode :: (Key -> Binary -> Binary) -> Key -> Nonce -> Binary -> Binary
+ctrMode cipher key nonce binary =
+  concat [ctrBlock cipher key nonce counter block | (counter, block) <- zip counters blocks]
+    where counters = [(pad 32 . intToBinary) n | n <- [0..len]]
+          blocks = group 64 binary
+          len = length blocks
+
+ctrBlock :: (Key -> Binary -> Binary) -> Key -> Nonce -> Binary -> Binary -> Binary
+ctrBlock cipher key nonce counter binary = binary `xor` (cipher key (nonce ++ counter))
 
 
 
 ------------------------------------------------------------------
---                        Main Functions                        --
+--                        DES Functions                         --
 ------------------------------------------------------------------
 
-padPlaintext :: Binary -> Binary
-padPlaintext binary = pad n binary
-  where n = if len `mod` 64 == 0
-              then len
-              else (div len 64 + 1) * 64
-        len = length binary
 
-encrypt :: Key -> Binary -> Binary
-encrypt key = des (keySchedule key) . padPlaintext
 
-decrypt :: Key -> Binary -> Binary
-decrypt key = des (reverse $ keySchedule key)
 
-des :: [Key] -> Binary -> Binary
-des keys binary = concatMap (desBlock keys) blocks
-  where blocks = group 64 binary
-
-desBlock :: [Key] -> Binary -> Binary
-desBlock keys = (finalPermutation . crypt . initialPermutation)
+des :: Key -> Binary -> Binary
+des key = (finalPermutation . crypt . initialPermutation)
   where crypt = uncurry (++) . applyKeys keys . halves
+        keys = keySchedule key
 
 applyKeys :: [Key] -> (Binary, Binary) -> (Binary, Binary)
 applyKeys [] (left, right) = (right, left)
@@ -83,6 +99,29 @@ applyKeys (key:keys) (left, right) =
 feistel :: Key -> (Binary, Binary) -> (Binary, Binary)
 feistel key (left, right) = (right, encrypted)
   where encrypted = xor (f key right) left
+
+
+----------------------------------------------------------------
+--                        PKCS7 Padding                       --
+----------------------------------------------------------------
+
+padPKCS7 :: Binary -> Binary
+padPKCS7 binary
+  | l `mod` 8 /= 0 = error "Has to be in bytes"
+  | l `mod` 64 == 0 = binary ++ (concat $ replicate 8 (pad 8 $ intToBinary $ 8))
+  | otherwise = binary ++ padding
+    where l = length binary
+          n = ((64 - (l `mod` 64)) `mod` 64) `div` 8
+          x = (pad 8 . intToBinary) n
+          padding = concat $ replicate n x
+
+depadPKCS7 :: Binary -> Binary
+depadPKCS7 binary
+  | l `mod` 8 /= 0 = error "Has to be in bytes"
+  | otherwise = (reverse . drop (8*b) . reverse) binary
+    where l = length binary
+          b = binaryToInt $ (reverse . take 8 . reverse) binary
+
 
 
 ----------------------------------------------------------------
@@ -114,9 +153,14 @@ keySchedule key = subKeys shifts (left, right)
 
 subKeys :: [Int] -> (Key, Key) -> [Key]
 subKeys [] _ = []
-subKeys (shift:shifts) (left, right) =
+subKeys (shift:shifts) (left, right) = --trace (showBinary $ (uncurry (++) subKey))
   permutedChoice2 (uncurry (++) subKey) : subKeys shifts subKey
-  where subKey = (leftShift shift left, leftShift shift right)
+  where subKey = (left', right')
+        left' = leftShift shift left
+        right' = leftShift shift right
+
+        --left' = trace ("L: " ++ (showBinary $ leftShift shift left)) leftShift shift left
+        --right' = trace ("R: " ++ (showBinary $ leftShift shift right)) leftShift shift right
 
 
 

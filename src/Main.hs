@@ -18,6 +18,8 @@ import GameState
 import Parsers
 import Valid
 import AI
+import DES
+import Binary
 
 -- run instructions in README.md
 
@@ -36,8 +38,7 @@ sendBoard :: MV.MVar GameState -> S.ActionM ()
 sendBoard gameStateVar = do
   board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
   currentPlayer <- liftIO $ GameState.currentPlayer <$> MV.readMVar gameStateVar
-  S.setHeader "Content-Type" "application/octet-stream" -- Set the content type to indicate binary data
-  S.raw $ LBS.fromStrict $ C8BS.pack (showFullBoard board currentPlayer)
+  sendData $ showFullBoard board currentPlayer
 
 
 poll :: MV.MVar GameState -> S.ActionM ()
@@ -70,9 +71,14 @@ start gameStateVar id = do
     _                  -> S.status badRequest400
 
 
+-- | 'moveAI' performs the same thing as 'move', but instead of waiting for
+--   the second player, the second player is the AI, and this calcuates
+--   the next best move, and plays it.
 moveAI :: MV.MVar GameState -> ID -> Route -> S.ActionM ()
 moveAI gameStateVar id route = do
+  -- Runs 'move'
   move gameStateVar id route
+  -- Then calcuates the next best move using minimax
   board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
   let bestMove = trace (show $ (best_move 5 score_count board Black)) (best_move 5 score_count board Black)
   case (best_move 3 score_count board Black) of
@@ -81,35 +87,58 @@ moveAI gameStateVar id route = do
 
 
 
+
+
+
+
+-- | 'move' is a function that takes an 'MV.MVar' that holds the 'GameState', 
+--   an 'ID' that represents the player making the move, and a 'Route' that 
+--   represents the move to be made. It returns a 'S.ActionM' action that sends 
+--   the updated board to the client.
 move :: MV.MVar GameState -> ID -> Route -> S.ActionM ()
 move gameStateVar id route = do
+  -- Check if the game has started.
   started <- liftIO $ GameState.started <$> MV.readMVar gameStateVar
   if not started
     then do
       liftIO $ putStrLn "Game has not started yet"
-      S.status badRequest400
+      S.status badRequest400 -- Send a Bad Request status.
     else do
+      -- Get the current board and player from the 'GameState'.
       board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
       currentPlayer <- liftIO $ GameState.currentPlayer <$> MV.readMVar gameStateVar
+      -- Check if the player is valid.
       check <- checkPlayer gameStateVar id
       if not check
         then do
           liftIO $ putStrLn "Invalid player"
-          S.status badRequest400
+          S.status badRequest400 -- Send a Bad Request status.
         else do
+          -- Get all the valid moves for the current player.
           let routes = getAllValidBoardsRoutes board currentPlayer
-          -- if the route is valid
+          -- Check if the move is valid.
           if route `elem` (map snd routes)
-            then do let newBoard = fst $ head $ filter (\(_, r) -> r == route) routes
-                    -- update the board in mvar
-                    liftIO $ MV.modifyMVar_ gameStateVar (\gs -> return gs {
-                      board = newBoard,
-                      currentPlayer = if currentPlayer == White then Black else White })
-                    -- send the new board to the client
-                    sendBoard gameStateVar
-            -- if the route is invalid
-            else do liftIO $ putStrLn "Invalid move"
-                    S.status badRequest400
+            then do
+              -- Get the new board after the move is made.
+              let newBoard = fst $ head $ filter (\(_, r) -> r == route) routes
+              -- Update the 'board' and 'currentPlayer' fields in the 'GameState' 'MV.MVar'.
+              liftIO $ MV.modifyMVar_ gameStateVar (\gs -> return gs {
+                board = newBoard,
+                currentPlayer = if currentPlayer == White then Black else White })
+              -- Send the new board to the client.
+              sendBoard gameStateVar
+            else do
+              liftIO $ putStrLn "Invalid move"
+              S.status badRequest400 -- Send a Bad Request status.
+
+
+
+
+
+
+
+
+
 
 checkPlayer :: MV.MVar GameState -> ID -> S.ActionM Bool
 checkPlayer gameStateVar id = do
@@ -119,6 +148,14 @@ checkPlayer gameStateVar id = do
             return $ whiteID == Just id
     else do blackID <- liftIO $ GameState.blackID <$> MV.readMVar gameStateVar
             return $ blackID == Just id
+
+sendData :: String -> S.ActionM ()
+sendData s = do
+  let key = stringToBinary "iwrsnfhl"
+  let nonce = replicate 32 False
+  let ciphertext = (encrypt key nonce. stringToBinary) s
+  S.setHeader "Content-Type" "application/octet-stream"
+  S.raw $ LBS.fromStrict $ C8BS.pack $ showBinary ciphertext
 
 
 

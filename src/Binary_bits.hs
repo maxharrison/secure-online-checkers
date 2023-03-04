@@ -1,5 +1,7 @@
 module Binary where
 
+import Data.Bits
+
 import Data.Char (ord, toLower, chr)
 
 
@@ -57,20 +59,6 @@ getIndexes (n:ns) xs = xs !! n : getIndexes ns xs
 stringToBinary :: String -> Binary
 stringToBinary = concatMap charToBinary
 
-binaryToString :: Binary -> String
-binaryToString = map binaryToChar . group 8
-
-
-charToBinary :: Char -> Binary
-charToBinary = pad 8 . intToBinary . ord
-
-binaryToChar :: Binary -> Char
-binaryToChar = chr . binaryToInt
-
-
-{- stringToBinary :: String -> Binary
-stringToBinary = concatMap charToBinary
-
 charToBinary :: Char -> Binary
 charToBinary c = (pad 8) $ reverse $ go (ord c) []
   where
@@ -81,15 +69,15 @@ binaryToChar :: [Bool] -> Char
 binaryToChar bs = chr $ go $ reverse $ (pad 8) bs
   where
     go [] = 0
-    go (b:bs) = (if b then 1 else 0) + 2 * go bs -}
+    go (b:bs) = (if b then 1 else 0) + 2 * go bs
 
 
 ----------------------------------------------------------------
 --                           Operations                       --
 ----------------------------------------------------------------
 
-xor :: Binary -> Binary -> Binary
-xor bsx bsy = [if x == y then False else True | (x, y) <- zip bsx bsy]
+xor' :: Binary -> Binary -> Binary
+xor' bsx bsy = [if x == y then False else True | (x, y) <- zip bsx bsy]
 
 leftShift :: Int -> Binary -> Binary
 leftShift n xs = take (length xs) . drop n $ cycle xs
