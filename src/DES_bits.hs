@@ -53,8 +53,12 @@ one = bit 0
 zero :: Bits a => a
 zero = zeroBits
 
-getBitBETTER :: Bits a => a -> Int -> a
-getBitBETTER x n = if testBit x n then one else zero
+getBit :: Bits a => a -> Int -> a
+getBit x n = if testBit x n then one else zero
+
+--getBitInPlace :: Bits a => a -> Int -> a
+--getBitInPlace x n = b `shiftL` n
+--  where b = if testBit x n then one else zero
 
 chunks :: Int -> [a] -> [[a]]
 chunks n [] = []
@@ -184,17 +188,19 @@ ctrBlock cipher key nonce counter bytes =
 ------------------------------------------------------------------
 
 
-des :: Key -> Word -> Word
+des :: Key -> Word64 -> Word64
 des key = (finalPermutation . crypt . initialPermutation)
-  where crypt = unhalves64 . applyKeys keys . halves64
-        keys = keySchedule key
+  where keys = keySchedule key
+        crypt = unhalves' . applyKeys keys . halves'
+        halves' = halves 64 . fromIntegral
+        unhalves' = unhalves 64 . (\(l, r) -> (fromIntegral l, fromIntegral r))
 
-applyKeys :: [Key] -> (Word, Word) -> (Word, Word)
+applyKeys :: [Key] -> (Word32, Word32) -> (Word32, Word32)
 applyKeys [] (left, right) = (right, left)
 applyKeys (key:keys) (left, right) =
   applyKeys keys $ feistel key (left, right)
 
-feistel :: Key -> (Word, Word) -> (Word, Word)
+feistel :: Key -> (Word32, Word32) -> (Word32, Word32)
 feistel key (left, right) = (right, encrypted)
   where encrypted = (f key right) `xor` left
 
@@ -205,10 +211,10 @@ feistel key (left, right) = (right, encrypted)
 ----------------------------------------------------------------
 
 
-f :: Key -> Word -> Word
-f key = permutation . sboxes . (xor key) . expansionFunction
+f :: Key -> Word32 -> Word32
+f key = permutation . sboxes . (xor (fromIntegral key)) . expansionFunction
 
-sboxes :: Word -> Word
+sboxes :: (Bits a, Integral a) => a -> a
 sboxes = ungroup 6 . zipWith ($) boxes . group 6
   where boxes = [sbox1, sbox2, sbox3, sbox4,
                  sbox5, sbox6, sbox7, sbox8]
@@ -227,14 +233,15 @@ subKeys :: [Int] -> Key -> [Key]
 subKeys [] _ = []
 subKeys (shift:shifts) subKey =
   permutedChoice2 subKey' : subKeys shifts subKey'
-  where subKey' = (rotateHalves shift subKey)
+  where subKey' = (rotateHalves 56 shift subKey)
 
-rotateHalves :: Int -> Word -> Word
-rotateHalves n word =
-  let (left, right) = halves56 word
-      left' = rotateL28 n left
-      right' = rotateL28 n right
-  in unhalves56 (left', right')
+rotateHalves :: Bits a => Int -> Int -> a -> a
+rotateHalves size n word =
+  let (left, right) = halves size word
+      left' = cShiftL halfSize n left
+      right' = cShiftL halfSize n right
+      halfSize = size `div` 2
+  in unhalves size (left', right')
 
 
 ----------------------------------------------------------------
@@ -242,69 +249,73 @@ rotateHalves n word =
 ----------------------------------------------------------------
 
 
--- 6 bit input, 4 bit output
-applySbox :: [[Word]] -> Word -> Word
-applySbox sbox word = sbox !! row !! column
-  where row = fromIntegral $ getNumber word [5,0]
-        column = fromIntegral $ getNumber word [4,3,2,1]
+-- ask graham if this has to be a integral,
+--  so it has to be an integer to !! into the list,
+--  and has to be an integral to be converted to an int,
+--  i could write my own function to convert to bits to an int,
+--  but i think that would be too messy
+applySbox :: (Bits a, Integral a) => [[a]] -> a -> a
+applySbox sbox bits = sbox !! row !! column
+  where row = fromIntegral $ getManyBits bits [5,0]
+        column = fromIntegral $ getManyBits bits [4,3,2,1]
 
-getNumber :: Word -> [Int] -> Word
-getNumber _ [] = 0b0
-getNumber word (x:xs) = shiftL (getBit x word) (length xs) .|. getNumber word xs
+getManyBits :: Bits a => a -> [Int] -> a
+getManyBits _ [] = zero
+getManyBits bits (x:xs) =
+  bit `shiftL` n .|. getManyBits bits xs
+    where bit = getBit bits x
+          n = length xs
 
-getBit :: Int -> Word -> Word
-getBit k n  = (shiftR n k) .&. 1
-
-sbox1 :: Word -> Word
+sbox1 :: (Bits a, Integral a) => a -> a
 sbox1 = applySbox [
   [14, 04, 13, 01, 02, 15, 11, 08, 03, 10, 06, 12, 05, 09, 00, 07],
   [00, 15, 07, 04, 14, 02, 13, 01, 10, 06, 12, 11, 09, 05, 03, 08],
   [04, 01, 14, 08, 13, 06, 02, 11, 15, 12, 09, 07, 03, 10, 05, 00],
   [15, 12, 08, 02, 04, 09, 01, 07, 05, 11, 03, 14, 10, 00, 06, 13]]
 
-sbox2 :: Word -> Word
+sbox2 :: (Bits a, Integral a) => a -> a
 sbox2 = applySbox [
   [15, 01, 08, 14, 06, 11, 03, 04, 09, 07, 02, 13, 12, 00, 05, 10],
   [03, 13, 04, 07, 15, 02, 08, 14, 12, 00, 01, 10, 06, 09, 11, 05],
   [00, 14, 07, 11, 10, 04, 13, 01, 05, 08, 12, 06, 09, 03, 02, 15],
   [13, 08, 10, 01, 03, 15, 04, 02, 11, 06, 07, 12, 00, 05, 14, 09]]
 
-sbox3 :: Word -> Word
+sbox3 :: (Bits a, Integral a) => a -> a
 sbox3 = applySbox [
   [10, 00, 09, 14, 06, 03, 15, 05, 01, 13, 12, 07, 11, 04, 02, 08],
   [13, 07, 00, 09, 03, 04, 06, 10, 02, 08, 05, 14, 12, 11, 15, 01],
   [13, 06, 04, 09, 08, 15, 03, 00, 11, 01, 02, 12, 05, 10, 14, 07],
   [01, 10, 13, 00, 06, 09, 08, 07, 04, 15, 14, 03, 11, 05, 02, 12]]
 
-sbox4 :: Word -> Word
+sbox4 :: (Bits a, Integral a) => a -> a
 sbox4 = applySbox [
   [07, 13, 14, 03, 00, 06, 09, 10, 01, 02, 08, 05, 11, 12, 04, 15],
   [13, 08, 11, 05, 06, 15, 00, 03, 04, 07, 02, 12, 01, 10, 14, 09],
   [10, 06, 09, 00, 12, 11, 07, 13, 15, 01, 03, 14, 05, 02, 08, 04],
   [03, 15, 00, 06, 10, 01, 13, 08, 09, 04, 05, 11, 12, 07, 02, 14]]
 
-sbox5 :: Word -> Word
+sbox5 :: (Bits a, Integral a) => a -> a
 sbox5 = applySbox [
   [02, 12, 04, 01, 07, 10, 11, 06, 08, 05, 03, 15, 13, 00, 14, 09],
   [14, 11, 02, 12, 04, 07, 13, 01, 05, 00, 15, 10, 03, 09, 08, 06],
   [04, 02, 01, 11, 10, 13, 07, 08, 15, 09, 12, 05, 06, 03, 00, 14],
   [11, 08, 12, 07, 01, 14, 02, 13, 06, 15, 00, 09, 10, 04, 05, 03]]
 
-sbox6 :: Word -> Word
+sbox6 :: (Bits a, Integral a) => a -> a
 sbox6 = applySbox [
   [12, 01, 10, 15, 09, 02, 06, 08, 00, 13, 03, 04, 14, 07, 05, 11],
   [10, 15, 04, 02, 07, 12, 09, 05, 06, 01, 13, 14, 00, 11, 03, 08],
   [09, 14, 15, 05, 02, 08, 12, 03, 07, 00, 04, 10, 01, 13, 11, 06],
   [04, 03, 02, 12, 09, 05, 15, 10, 11, 14, 01, 07, 06, 00, 08, 13]]
 
-sbox7 :: Word -> Word
+sbox7 :: (Bits a, Integral a) => a -> a
 sbox7 = applySbox [
   [04, 11, 02, 14, 15, 00, 08, 13, 03, 12, 09, 07, 05, 10, 06, 01],
   [13, 00, 11, 07, 04, 09, 01, 10, 14, 03, 05, 12, 02, 15, 08, 06],
   [01, 04, 11, 13, 12, 03, 07, 14, 10, 15, 06, 08, 00, 05, 09, 02],
   [06, 11, 13, 08, 01, 04, 10, 07, 09, 05, 00, 15, 14, 02, 03, 12]]
 
-sbox8 :: Word -> Word
+sbox8 :: (Bits a, Integral a) => a -> a
 sbox8 = applySbox [
   [13, 02, 08, 04, 06, 15, 11, 01, 10, 09, 03, 14, 05, 00, 12, 07],
   [01, 15, 13, 08, 10, 03, 07, 04, 12, 05, 06, 11, 00, 14, 09, 02],
@@ -318,21 +329,11 @@ sbox8 = applySbox [
 ----------------------------------------------------------------
 
 
-applyTable1 :: Int -> Int -> [Int] -> Word -> Word
-applyTable1 input_len output_len table word = build (zip [0..] table) word
-    where build [] _ = 0b1
-          build ((output_pos, pos):xs) word =
-            let input_pos = input_len - (pos)
-                input_bit = (word `shiftR` input_pos) .&. 0b1
-                output_bit = input_bit `shiftL` ((output_len - 1) - output_pos)
-            in output_bit .|. build xs word
-
-
 applyTable :: Bits a => Int -> [Int] -> a -> a
 applyTable _ [] _ = zero
 applyTable input_len (pos:xs) bits =
   let input_pos = input_len - pos
-      input_bit = getBitBETTER bits input_pos
+      input_bit = getBit bits input_pos
       output_pos = length xs
       output_bit = input_bit `shiftL` output_pos
   in output_bit .|. applyTable input_len xs bits
