@@ -38,28 +38,25 @@ targetTest = map (\i -> if i==1 then True else False)
    1, 0, 1, 0, 0, 1, 1, 1,
    0, 1, 0, 0, 1, 0, 0, 1,
    1, 0, 0, 1, 1, 1, 0, 1]
-{- 
+ 
 
 main = do
-  let plaintext = stringToBinary "abcdefg"
+  let nonce = (replicate 30 False) ++ [True, False]
+  let ciphertext = encrypt keyTest nonce plaintextTest
 
-  let key = stringToBinary "secretke"
-
-  let nonce = replicate 32 False
-
-  let ciphertext = encrypt key nonce plaintext
-
-  putStrLn $ showBinary $ plaintext
-  putStrLn $ showBinary $ ciphertext
-  putStrLn $ binaryToString $ decrypt key nonce ciphertext
+  putStrLn $ binaryToString $ plaintextTest
+  putStrLn $ binaryToString $ ciphertext
+  putStrLn $ binaryToString $ decrypt keyTest nonce ciphertext
 
 
- -}
+
+
+ 
 encrypt :: Key -> Nonce -> Binary -> Binary
-encrypt key nonce binary = (ctrMode des key nonce . padPKCS7) binary
+encrypt key nonce = ctrMode des key nonce . padPKCS7
 
 decrypt :: Key -> Nonce -> Binary -> Binary
-decrypt key nonce binary = (depadPKCS7 . ctrMode des key nonce) binary
+decrypt key nonce = depadPKCS7 . ctrMode des key nonce
 
 
 ------------------------------------------------------------------
@@ -87,7 +84,7 @@ ctrBlock cipher key nonce counter binary = binary `xor` (cipher key (nonce ++ co
 
 
 des :: Key -> Binary -> Binary
-des key = (finalPermutation . crypt . initialPermutation)
+des key bits = trace (showBinary bits) (finalPermutation . crypt . initialPermutation) bits
   where crypt = uncurry (++) . applyKeys keys . halves
         keys = keySchedule key
 

@@ -36,7 +36,10 @@ group size x
         xs = group size (x `shiftR` size)
     in xs ++ [y]
 
-ungroup :: Bits a => Int -> [a] -> a
+-- did have this type ungroup :: Bits a => Int -> [a] -> a, but it meant if
+  -- you were ungrouping 2 Word32s, they were just returning a word32,
+  -- so half the bits would be ignored
+ungroup :: Int -> [Word] -> Word
 ungroup _ [] = zero
 ungroup size (x:xs) = (x `shiftL` n) .|. ungroup size xs
   where n = size * length xs
@@ -67,64 +70,51 @@ chunks n xs = take n xs : chunks n (drop n xs)
 ------------------------------------------------------------------
 
 
+plainTest :: [Word8]
+plainTest = [
+  0b00010001,
+  0b00100010,
+  0b00110011,
+  0b01000100,
+  0b01010101,
+  0b01100110,
+  0b01110111,
+  0b10001000]
 
 
-halves64 :: Word -> (Word, Word)
-halves64 word = (word `shiftR` 32, word .&. 0xFFFFFFFF)
-unhalves64 :: (Word, Word) -> Word
-unhalves64 (left, right) = (right .|. (left `shiftL` 32)) .&. 0xFFFFFFFFFFFFFFFF
-
-rotateL28 :: Int -> Word -> Word
-rotateL28 n x = ((x `shiftL` n) .&. 0xFFFFFFF)  .|. (x `shiftR` (28 - n))
-
-halves56 :: Word -> (Word, Word)
-halves56 word = (word `shiftR` 28, word .&. 0xFFFFFFF)
-
-unhalves56 :: (Word, Word) -> Word
-unhalves56 (left, right) = (right .|. (left `shiftL` 28)) .&. 0xFFFFFFFFFFFFFF
 
 
-{- plaintextTest = map (\i -> if i==1 then True else False)
-  [0, 0, 0, 1, 0, 0, 0, 1,
-   0, 0, 1, 0, 0, 0, 1, 0,
-   0, 0, 1, 1, 0, 0, 1, 1,
-   0, 1, 0, 0, 0, 1, 0, 0,
-   0, 1, 0, 1, 0, 1, 0, 1,
-   0, 1, 1, 0, 0, 1, 1, 0,
-   0, 1, 1, 1, 0, 1, 1, 1,
-   1, 0, 0, 0, 1, 0, 0, 0]
+keyTest :: Word
+keyTest = 0b0111010100101000011110000011100101110100100100111100101101110000
 
-key = map (\i -> if i==1 then True else False)
-  [0, 1, 1, 1, 0, 1, 0, 1,
-   0, 0, 1, 0, 1, 0, 0, 0,
-   0, 1, 1, 1, 1, 0, 0, 0,
-   0, 0, 1, 1, 1, 0, 0, 1,
-   0, 1, 1, 1, 0, 1, 0, 0,
-   1, 0, 0, 1, 0, 0, 1, 1,
-   1, 1, 0, 0, 1, 0, 1, 1,
-   0, 1, 1, 1, 0, 0, 0, 0]
+targetTest :: [Word8]
+targetTest = [
+  0b10110101,
+  0b00100001,
+  0b10011110,
+  0b11101000,
+  0b00011010,
+  0b10100111,
+  0b01001001,
+  0b10011101]
 
-targetTest = map (\i -> if i==1 then True else False)
-  [1, 0, 1, 1, 0, 1, 0, 1,
-   0, 0, 1, 0, 0, 0, 0, 1,
-   1, 0, 0, 1, 1, 1, 1, 0,
-   1, 1, 1, 0, 1, 0, 0, 0,
-   0, 0, 0, 1, 1, 0, 1, 0,
-   1, 0, 1, 0, 0, 1, 1, 1,
-   0, 1, 0, 0, 1, 0, 0, 1,
-   1, 0, 0, 1, 1, 1, 0, 1]
+
+bytesToString :: [Word8] -> String
+bytesToString = map (chr . fromIntegral)
+
+stringToBytes :: String -> [Word8]
+stringToBytes = map (fromIntegral . ord)
+
 
 
 main = do
-  let plaintext = plaintextTest
-  let ciphertext = encrypt key plaintext
-  let decrypted = decrypt key ciphertext
-  putStrLn $ "plaintext:    " ++ showBinary plaintext
-  putStrLn $ "ciphertext:   " ++ showBinary ciphertext
-  putStrLn $ "decrypted:    " ++ showBinary decrypted
-  print $ ciphertext == targetTest
+  let nonce = 0b10
+  let cipherTest = encrypt keyTest nonce (map fromIntegral plainTest)
+  let decrypted = decrypt keyTest nonce cipherTest
+  putStrLn $ "plaintext : " ++ bytesToString plainTest
+  putStrLn $ "ciphertext: " ++ bytesToString cipherTest
+  putStrLn $ "decrypted : " ++ bytesToString decrypted
 
--}
 
 
 ------------------------------------------------------------------
@@ -132,11 +122,11 @@ main = do
 ------------------------------------------------------------------
 
 
---encrypt :: Key -> Nonce -> Word -> Word
---encrypt key nonce binary = (ctrMode des key nonce . padPKCS7) word
+encrypt :: Key -> Nonce -> [Word8] -> [Word8]
+encrypt key nonce = ctrMode des key nonce . padPKCS7 64
 
---decrypt :: Key -> Nonce -> Word -> Word
---decrypt key nonce word = (depadPKCS7 . ctrMode des key nonce) word
+decrypt :: Key -> Nonce -> [Word8] -> [Word8]
+decrypt key nonce = unpadPKCS7 . ctrMode des key nonce
 
 
 ----------------------------------------------------------------
@@ -168,19 +158,23 @@ type Nonce = Word32 -- MAYBE SELECT A LENGTH
 type Counter = Word32
 
 
---ctrMode :: (Key -> Word -> Word) -> Key -> Nonce -> Word -> Word
---ctrMode cipher key nonce binary =
---  concat [ctrBlock cipher key nonce counter block | (counter, block) <- zip counters blocks]
---    where counters = [(pad 32 . intToBinary) n | n <- [0..len]]
---          blocks = group 64 binary
---          len = length blocks
+ctrMode :: (Key -> Word64 -> Word64) -> Key -> Nonce -> [Word8] -> [Word8]
+ctrMode cipher key nonce bytes =
+  concat [crypt (fromIntegral counter) block | (counter, block) <- zip counters blocks]
+    where crypt = ctrBlock cipher key nonce
+          counters = [n | n <- [0..len]]
+          blocks = chunks 8 bytes
+          len = length blocks
 
-ctrBlock :: (Key -> Word -> Word) -> Key -> Nonce -> Counter -> [Word8] -> [Word8]
+ctrBlock :: (Key -> Word64 -> Word64) -> Key -> Nonce -> Counter -> [Word8] -> [Word8]
 ctrBlock cipher key nonce counter bytes =
   group 8 $ (block_key `xor` block)
-    where counter_block = fromIntegral $ ungroup 32 [nonce, counter]
+    where counter_block = ungroup 32 [fromIntegral nonce, fromIntegral counter]
           block_key = fromIntegral $ cipher key counter_block
-          block = fromIntegral $ ungroup 64 bytes
+          block = ungroup 64 (bytes)
+
+
+
 
 
 ------------------------------------------------------------------
@@ -189,7 +183,7 @@ ctrBlock cipher key nonce counter bytes =
 
 
 des :: Key -> Word64 -> Word64
-des key = (finalPermutation . crypt . initialPermutation)
+des key bits = trace (showBinary bits) (finalPermutation . crypt . initialPermutation) bits
   where keys = keySchedule key
         crypt = unhalves' . applyKeys keys . halves'
         halves' = halves 64 . fromIntegral
