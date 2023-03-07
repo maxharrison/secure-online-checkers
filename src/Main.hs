@@ -20,6 +20,8 @@ import Valid
 import AI
 import DES
 import Binary
+import qualified DES_bits as D
+import Data.Bits
 
 -- run instructions in README.md
 
@@ -151,11 +153,25 @@ checkPlayer gameStateVar id = do
 
 sendData :: String -> S.ActionM ()
 sendData s = do
-  let key = stringToBinary "iwrsnfhl"
+  let key = map (\c -> c=='1') "0110100101110111011100100111001101101110011001100110100001101100"
   let nonce = replicate 32 False
   let ciphertext = (encrypt key nonce. stringToBinary) s
+  liftIO $ print $ showBinary $ stringToBinary s
+  let string = showBinary ciphertext
+  liftIO $ putStrLn $ "THIS: -" ++ string ++ "- END"
   S.setHeader "Content-Type" "application/octet-stream"
-  S.raw $ LBS.fromStrict $ C8BS.pack $ showBinary ciphertext
+  S.raw $ LBS.fromStrict $ C8BS.pack string
+
+sendData1 :: String -> S.ActionM ()
+sendData1 s = do
+  let key = 0b0110100101110111011100100111001101101110011001100110100001101100 --(ungroup . D.stringToBytes) "iwrsnfhl"
+  let nonce = D.zero
+  let ciphertext = (D.encrypt key nonce . D.stringToBytes) s
+  --liftIO $ print $ D.showBinary $ D.stringToBytes s
+  let string = D.showBinary $ D.ungroup 8 ciphertext
+  liftIO $ putStrLn $ "THIS: -" ++ string ++ "- END"
+  S.setHeader "Content-Type" "application/octet-stream"
+  S.raw $ LBS.fromStrict $ C8BS.pack string
 
 
 

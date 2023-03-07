@@ -9,6 +9,7 @@ type Nonce = Binary
 
 
 
+
 plaintextTest = map (\i -> if i==1 then True else False)
   [0, 0, 0, 1, 0, 0, 0, 1,
    0, 0, 1, 0, 0, 0, 1, 0,
@@ -40,13 +41,23 @@ targetTest = map (\i -> if i==1 then True else False)
    1, 0, 0, 1, 1, 1, 0, 1]
  
 
-main = do
-  let nonce = (replicate 30 False) ++ [True, False]
-  let ciphertext = encrypt keyTest nonce plaintextTest
+nonce :: Nonce
+nonce = replicate 32 False--map (\c -> c == '1') "10011000011011001101110001100001"
+                              -- 10010000011001000011000001110101"
 
-  putStrLn $ binaryToString $ plaintextTest
-  putStrLn $ binaryToString $ ciphertext
-  putStrLn $ binaryToString $ decrypt keyTest nonce ciphertext
+main1 :: IO ()
+main1 = do
+  let ciphertext = des keyTest plaintextTest
+
+  --putStrLn $ "plaintext : " ++ showBinary plaintextTest
+  --putStrLn $ "ciphertext: " ++ showBinary ciphertext
+  print $ targetTest == ciphertext
+
+  putStrLn $ "ciphertext: " ++ (showBinary $ encrypt keyTest nonce plaintextTest)
+
+
+
+
 
 
 
@@ -67,7 +78,7 @@ decrypt key nonce = depadPKCS7 . ctrMode des key nonce
 ctrMode :: (Key -> Binary -> Binary) -> Key -> Nonce -> Binary -> Binary
 ctrMode cipher key nonce binary =
   concat [ctrBlock cipher key nonce counter block | (counter, block) <- zip counters blocks]
-    where counters = [(pad 32 . intToBinary) n | n <- [0..len]]
+    where counters = [(pad 32 . intToBinary) n | n <- [1..]]
           blocks = group 64 binary
           len = length blocks
 
@@ -84,14 +95,18 @@ ctrBlock cipher key nonce counter binary = binary `xor` (cipher key (nonce ++ co
 
 
 des :: Key -> Binary -> Binary
-des key bits = trace (showBinary bits) (finalPermutation . crypt . initialPermutation) bits
+des key bits = (finalPermutation . crypt . initialPermutation) bits
   where crypt = uncurry (++) . applyKeys keys . halves
         keys = keySchedule key
 
 applyKeys :: [Key] -> (Binary, Binary) -> (Binary, Binary)
 applyKeys [] (left, right) = (right, left)
-applyKeys (key:keys) (left, right) =
+applyKeys (key:keys) (left, right) = --trace ("c[" ++ (showBinary ((f key left))) ++ " : " ++ (show $ length keys) ++"]o")
   applyKeys keys $ feistel key (left, right)
+
+
+
+
 
 feistel :: Key -> (Binary, Binary) -> (Binary, Binary)
 feistel key (left, right) = (right, encrypted)
@@ -305,3 +320,4 @@ permutedChoice2 = applyTable [
   30, 40, 51, 45, 33, 48,
   44, 49, 39, 56, 34, 53,
   46, 42, 50, 36, 29, 32]
+

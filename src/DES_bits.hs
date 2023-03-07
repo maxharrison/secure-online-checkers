@@ -1,20 +1,138 @@
-module DES where
+module DES_bits where
 
 import Debug.Trace
 import Data.Word
 import Data.Bits 
-
 import Data.Char
-
+import Test.HUnit
 import Numeric (showIntAtBase)
 
-type Key = Word
 
-showBinary b = showIntAtBase 2 intToDigit b ""
+------------------------------------------------------------------
+--                            Tests                             --
+------------------------------------------------------------------
 
-key1 :: Key
+{- key1 :: Key
 key1 = 0b0111010100101000011110000011100101110100100100111100101101110000
 
+
+
+
+
+
+
+plaintextTestWords :: [Word]
+plaintextTestWords = [
+  0b00010001,
+  0b00100010,
+  0b00110011,
+  0b01000100,
+  0b01010101,
+  0b01100110,
+  0b01110111,
+  0b10001001]
+
+plaintextTest :: Word
+plaintextTest =
+  0b0001000100100010001100110100010001010101011001100111011110001000
+
+keyTest :: Word
+keyTest =
+  0b0111010100101000011110000011100101110100100100111100101101110000
+
+targetTest :: Word
+targetTest =
+  0b1011010100100001100111101110100000011010101001110100100110011101
+
+nonceTest :: Nonce
+nonceTest = zeroBits
+ -}
+--main :: IO ()
+--main = do
+--  let ciphertextTest = des keyTest plaintextTest
+  --putStrLn $ "plaintext : " ++ showBinary plaintextTest
+  --putStrLn $ "ciphertext: " ++ showBinary ciphertextTest
+--  print $ targetTest == ciphertextTest
+
+--  print $ (padPKCS7 64 plaintextTestWords)
+
+ -- print $ map showBinary $ counterMode keyTest nonceTest (padPKCS7 64 plaintextTestWords)
+
+--  print $ map showBinary $ encrypt keyTest nonceTest plaintextTestWords
+  --putStrLn $ "ciphertext: " ++ (showBinary $ ungroup 8 $ encrypt keyTest nonceTest plaintextTestWords)
+  --putStrLn $ "decerypted: " ++ (showBinary $ ungroup 8 $ decrypt keyTest nonceTest (encrypt keyTest nonceTest plaintextTestWords))
+
+
+
+
+testDES :: Test
+testDES = TestList [
+  let key =       0b0111010100101000011110000011100101110100100100111100101101110000
+      plaintext = 0b0001000100100010001100110100010001010101011001100111011110001000
+      target =    0b1011010100100001100111101110100000011010101001110100100110011101
+  in TestCase $ assertEqual "des failed 1" target (des key plaintext),
+  let key =       0b0111010100101000011110000011100101110100100100111100101101110000
+      plaintext = 0b0000000000000000000000000000000000000000000000000000000000000000
+      target =    0b0101011001110010000111100100000010100110100110010001010010101110
+  in TestCase $ assertEqual "des failed 2" target (des key plaintext),
+  let key =       0b0111010100101000011110000011100101110100100100111100101101110000
+      plaintext = 0b0000000000000000000000000000000000000000000000000000000000000001
+      target =    0b0101010001110010010000000100000100101100110110000011101000000110
+  in TestCase $ assertEqual "des failed 3" target (des key plaintext),
+  let key =       0b1101111101100001011010001110100000111010101101111001000100011110
+      plaintext = 0b1000111001100000110111100000101010010111111001001110111001000001
+      target =    0b0000000101000101001001001101100100111111010010000010011111011001
+  in TestCase $ assertEqual "des failed 4" target (des key plaintext)
+  ]
+
+testPadding :: Test
+testPadding = TestList [
+  padPKCS7 8 (stringToBytes "YELLOWS") ~?= (stringToBytes "YELLOWS" ++ replicate 1 1),
+  padPKCS7 8 (stringToBytes "YELLOWSU") ~?= (stringToBytes "YELLOWSU" ++ replicate 8 8),
+  padPKCS7 16 (stringToBytes "YELLOWSUBMARINE") ~?= (stringToBytes "YELLOWSUBMARINE" ++ replicate 1 1),
+  padPKCS7 16 (stringToBytes "YELLOWSUBMARINE!") ~?= (stringToBytes "YELLOWSUBMARINE!" ++ replicate 16 16),
+  unpadPKCS7 (stringToBytes "YELLOWSUBMARINE!" ++ replicate 16 16) ~?= (stringToBytes "YELLOWSUBMARINE!")]
+
+testCounterMode :: Test
+testCounterMode = 
+  let key = 0b0111010100101000011110000011100101110100100100111100101101110000
+      nonce = 0b0000000000000000000000000000000000000000000000000000000000000000
+      plaintext = [0b00010001,0b00100010,0b00110011,0b01000100,0b01010101,0b01100110,0b01110111,0b10001000]
+
+      target = [0b01000111,0b01010000,0b00101101,0b00000100,0b11110011,0b11111111,0b01100011,0b00100110,
+                0b01011100,0b01111010,0b01001000,0b01001001,0b00100100,0b11010000,0b00110010,0b00001110]
+  in TestCase $ assertEqual "ctr failed" target (counterMode key nonce $ padPKCS7 8 plaintext)
+
+tests :: Test
+tests = TestList [
+  testDES,
+  testPadding]
+
+main :: IO ()
+main = do
+  runTestTT tests
+  putStrLn "Done"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------------------------------
+--                            Types                             --
+------------------------------------------------------------------
+
+type Key = Word
+type Nonce = Word
+type Counter = Word
 
 ------------------------------------------------------------------
 --                       Helper Functions                       --
@@ -28,6 +146,7 @@ unhalves :: Bits a => Int -> (a, a) -> a
 unhalves size (left, right) = (right .|. (left `shiftL` half_size)) .&. mask size
     where half_size = size `div` 2
 
+-- same as with ungroup with the types
 group :: Bits a => Int -> a -> [a]
 group size x
   | popCount x == 0 = []
@@ -37,7 +156,7 @@ group size x
     in xs ++ [y]
 
 -- did have this type ungroup :: Bits a => Int -> [a] -> a, but it meant if
-  -- you were ungrouping 2 Word32s, they were just returning a word32,
+  -- you were ungrouping 2 Words, they were just returning a Word,
   -- so half the bits would be ignored
 ungroup :: Int -> [Word] -> Word
 ungroup _ [] = zero
@@ -59,74 +178,32 @@ zero = zeroBits
 getBit :: Bits a => a -> Int -> a
 getBit x n = if testBit x n then one else zero
 
---getBitInPlace :: Bits a => a -> Int -> a
---getBitInPlace x n = b `shiftL` n
---  where b = if testBit x n then one else zero
+bytesToString :: [Word] -> String
+bytesToString = map (chr . fromIntegral)
+
+stringToBytes :: String -> [Word]
+stringToBytes = map (fromIntegral . ord)
 
 chunks :: Int -> [a] -> [[a]]
 chunks n [] = []
 chunks n xs = take n xs : chunks n (drop n xs)
 
+showBinary b = showIntAtBase 2 intToDigit b ""
+
+------------------------------------------------------------------
+--                 Encrypt/Decrypt Functions                    --
 ------------------------------------------------------------------
 
 
-plainTest :: [Word8]
-plainTest = [
-  0b00010001,
-  0b00100010,
-  0b00110011,
-  0b01000100,
-  0b01010101,
-  0b01100110,
-  0b01110111,
-  0b10001000]
 
+encrypt :: Key -> Nonce -> [Word] -> [Word]
+--encrypt key nonce = ctrMode des key nonce . padPKCS7 8
+encrypt key nonce bytes = (counterMode key nonce . padPKCS7 8) bytes
 
+decrypt :: Key -> Nonce -> [Word] -> [Word]
+--decrypt key nonce = unpadPKCS7 . ctrMode des key nonce
+decrypt key nonce bytes = (unpadPKCS7 . counterMode key nonce) bytes
 
-
-keyTest :: Word
-keyTest = 0b0111010100101000011110000011100101110100100100111100101101110000
-
-targetTest :: [Word8]
-targetTest = [
-  0b10110101,
-  0b00100001,
-  0b10011110,
-  0b11101000,
-  0b00011010,
-  0b10100111,
-  0b01001001,
-  0b10011101]
-
-
-bytesToString :: [Word8] -> String
-bytesToString = map (chr . fromIntegral)
-
-stringToBytes :: String -> [Word8]
-stringToBytes = map (fromIntegral . ord)
-
-
-
-main = do
-  let nonce = 0b10
-  let cipherTest = encrypt keyTest nonce (map fromIntegral plainTest)
-  let decrypted = decrypt keyTest nonce cipherTest
-  putStrLn $ "plaintext : " ++ bytesToString plainTest
-  putStrLn $ "ciphertext: " ++ bytesToString cipherTest
-  putStrLn $ "decrypted : " ++ bytesToString decrypted
-
-
-
-------------------------------------------------------------------
---                        Main Functions                        --
-------------------------------------------------------------------
-
-
-encrypt :: Key -> Nonce -> [Word8] -> [Word8]
-encrypt key nonce = ctrMode des key nonce . padPKCS7 64
-
-decrypt :: Key -> Nonce -> [Word8] -> [Word8]
-decrypt key nonce = unpadPKCS7 . ctrMode des key nonce
 
 
 ----------------------------------------------------------------
@@ -134,15 +211,15 @@ decrypt key nonce = unpadPKCS7 . ctrMode des key nonce
 ----------------------------------------------------------------
 
 
-
-
-padPKCS7 :: Int -> [Word8] -> [Word8]
-padPKCS7 block_len bytes = bytes ++ padding
-  where padding_len = ((block_len `div` 8) - (length bytes `mod` (block_len `div` 8)))
+-- int is the number of bytes in a block
+padPKCS7 :: Int -> [Word] -> [Word]
+padPKCS7 block_bytes_len bytes = bytes ++ padding
+  where bytes_len = length bytes
+        padding_len = block_bytes_len - (bytes_len `mod` block_bytes_len)
         padding = replicate padding_len (fromIntegral padding_len)
 
 
-unpadPKCS7 :: [Word8] -> [Word8]
+unpadPKCS7 :: [Word] -> [Word]
 unpadPKCS7 bytes = take len bytes
   where bytes_len = length bytes
         padding_len = fromIntegral $ last bytes
@@ -154,26 +231,29 @@ unpadPKCS7 bytes = take len bytes
 --                      CTR - Counter Mode                      --
 ------------------------------------------------------------------
 
-type Nonce = Word32 -- MAYBE SELECT A LENGTH
-type Counter = Word32
+--ctrMode :: (Key -> Word -> Word) -> Key -> Nonce -> [Word] -> [Word]
+--ctrMode cipher key nonce bytes =
+--  concat [ctrBlock cipher key nonce counter block | (counter, block) <- zip counters blocks]
+--    where counters = [(fromIntegral n) | n <- [0..len]]
+--          blocks = chunks 8 bytes
+--          len = length blocks
 
+--ctrBlock :: (Key -> Word -> Word) -> Key -> Nonce -> Counter -> [Word] -> [Word]
+--ctrBlock cipher key nonce counter bytes =
+--  group 8 $ (block_key `xor` block)
+--    where counter_block = ungroup 32 [nonce, counter]
+--          block_key = cipher key counter_block
+--          block = ungroup 64 (bytes)
 
-ctrMode :: (Key -> Word64 -> Word64) -> Key -> Nonce -> [Word8] -> [Word8]
-ctrMode cipher key nonce bytes =
-  concat [crypt (fromIntegral counter) block | (counter, block) <- zip counters blocks]
-    where crypt = ctrBlock cipher key nonce
-          counters = [n | n <- [0..len]]
-          blocks = chunks 8 bytes
-          len = length blocks
-
-ctrBlock :: (Key -> Word64 -> Word64) -> Key -> Nonce -> Counter -> [Word8] -> [Word8]
-ctrBlock cipher key nonce counter bytes =
-  group 8 $ (block_key `xor` block)
-    where counter_block = ungroup 32 [fromIntegral nonce, fromIntegral counter]
-          block_key = fromIntegral $ cipher key counter_block
-          block = ungroup 64 (bytes)
-
-
+--ciphertextTest = des keyTest plaintextTest
+counterMode :: Key -> Nonce -> [Word] -> [Word]
+counterMode key nonce bytes = 
+  let blocks = map (ungroup 8) (chunks 8 bytes)
+      block_len = length blocks
+      counter_blocks = [ungroup 32 [nonce, fromIntegral counter] | counter <- [0..block_len]]
+      key_stream_blocks = map (des key) counter_blocks
+  in concatMap (\(b,k) -> group 8 (b `xor` k)) $ zip blocks key_stream_blocks
+    --trace (" -|S " ++ show (length $ bytes) ++ " E|- ") [block `xor` key_stream | (block, key_stream) <- zip blocks key_stream_blocks]
 
 
 
@@ -182,19 +262,17 @@ ctrBlock cipher key nonce counter bytes =
 ------------------------------------------------------------------
 
 
-des :: Key -> Word64 -> Word64
-des key bits = trace (showBinary bits) (finalPermutation . crypt . initialPermutation) bits
+des :: Key -> Word -> Word
+des key bits = (finalPermutation . crypt . initialPermutation) bits --trace (" |k: " ++ showBinary key ++ " b: " ++ showBinary bits ++ " r: " ++ showBinary ((finalPermutation . crypt . initialPermutation) bits)) (finalPermutation . crypt . initialPermutation) bits
   where keys = keySchedule key
-        crypt = unhalves' . applyKeys keys . halves'
-        halves' = halves 64 . fromIntegral
-        unhalves' = unhalves 64 . (\(l, r) -> (fromIntegral l, fromIntegral r))
+        crypt = unhalves 64 . applyKeys keys . halves 64
 
-applyKeys :: [Key] -> (Word32, Word32) -> (Word32, Word32)
+applyKeys :: [Key] -> (Word, Word) -> (Word, Word)
 applyKeys [] (left, right) = (right, left)
 applyKeys (key:keys) (left, right) =
   applyKeys keys $ feistel key (left, right)
 
-feistel :: Key -> (Word32, Word32) -> (Word32, Word32)
+feistel :: Key -> (Word, Word) -> (Word, Word)
 feistel key (left, right) = (right, encrypted)
   where encrypted = (f key right) `xor` left
 
@@ -205,11 +283,11 @@ feistel key (left, right) = (right, encrypted)
 ----------------------------------------------------------------
 
 
-f :: Key -> Word32 -> Word32
-f key = permutation . sboxes . (xor (fromIntegral key)) . expansionFunction
+f :: Key -> Word -> Word
+f key = permutation . sboxes . (xor key) . expansionFunction
 
-sboxes :: (Bits a, Integral a) => a -> a
-sboxes = ungroup 6 . zipWith ($) boxes . group 6
+sboxes :: Word -> Word
+sboxes = ungroup 4 . zipWith ($) boxes . group 6
   where boxes = [sbox1, sbox2, sbox3, sbox4,
                  sbox5, sbox6, sbox7, sbox8]
 
@@ -243,73 +321,70 @@ rotateHalves size n word =
 ----------------------------------------------------------------
 
 
--- ask graham if this has to be a integral,
---  so it has to be an integer to !! into the list,
---  and has to be an integral to be converted to an int,
---  i could write my own function to convert to bits to an int,
---  but i think that would be too messy
-applySbox :: (Bits a, Integral a) => [[a]] -> a -> a
+
+
+applySbox :: [[Word]] -> Word -> Word
 applySbox sbox bits = sbox !! row !! column
   where row = fromIntegral $ getManyBits bits [5,0]
         column = fromIntegral $ getManyBits bits [4,3,2,1]
 
-getManyBits :: Bits a => a -> [Int] -> a
+getManyBits :: Word -> [Int] -> Word
 getManyBits _ [] = zero
 getManyBits bits (x:xs) =
   bit `shiftL` n .|. getManyBits bits xs
     where bit = getBit bits x
           n = length xs
 
-sbox1 :: (Bits a, Integral a) => a -> a
+sbox1 :: Word -> Word
 sbox1 = applySbox [
   [14, 04, 13, 01, 02, 15, 11, 08, 03, 10, 06, 12, 05, 09, 00, 07],
   [00, 15, 07, 04, 14, 02, 13, 01, 10, 06, 12, 11, 09, 05, 03, 08],
   [04, 01, 14, 08, 13, 06, 02, 11, 15, 12, 09, 07, 03, 10, 05, 00],
   [15, 12, 08, 02, 04, 09, 01, 07, 05, 11, 03, 14, 10, 00, 06, 13]]
 
-sbox2 :: (Bits a, Integral a) => a -> a
+sbox2 :: Word -> Word
 sbox2 = applySbox [
   [15, 01, 08, 14, 06, 11, 03, 04, 09, 07, 02, 13, 12, 00, 05, 10],
   [03, 13, 04, 07, 15, 02, 08, 14, 12, 00, 01, 10, 06, 09, 11, 05],
   [00, 14, 07, 11, 10, 04, 13, 01, 05, 08, 12, 06, 09, 03, 02, 15],
   [13, 08, 10, 01, 03, 15, 04, 02, 11, 06, 07, 12, 00, 05, 14, 09]]
 
-sbox3 :: (Bits a, Integral a) => a -> a
+sbox3 :: Word -> Word
 sbox3 = applySbox [
   [10, 00, 09, 14, 06, 03, 15, 05, 01, 13, 12, 07, 11, 04, 02, 08],
   [13, 07, 00, 09, 03, 04, 06, 10, 02, 08, 05, 14, 12, 11, 15, 01],
   [13, 06, 04, 09, 08, 15, 03, 00, 11, 01, 02, 12, 05, 10, 14, 07],
   [01, 10, 13, 00, 06, 09, 08, 07, 04, 15, 14, 03, 11, 05, 02, 12]]
 
-sbox4 :: (Bits a, Integral a) => a -> a
+sbox4 :: Word -> Word
 sbox4 = applySbox [
   [07, 13, 14, 03, 00, 06, 09, 10, 01, 02, 08, 05, 11, 12, 04, 15],
   [13, 08, 11, 05, 06, 15, 00, 03, 04, 07, 02, 12, 01, 10, 14, 09],
   [10, 06, 09, 00, 12, 11, 07, 13, 15, 01, 03, 14, 05, 02, 08, 04],
   [03, 15, 00, 06, 10, 01, 13, 08, 09, 04, 05, 11, 12, 07, 02, 14]]
 
-sbox5 :: (Bits a, Integral a) => a -> a
+sbox5 :: Word -> Word
 sbox5 = applySbox [
   [02, 12, 04, 01, 07, 10, 11, 06, 08, 05, 03, 15, 13, 00, 14, 09],
   [14, 11, 02, 12, 04, 07, 13, 01, 05, 00, 15, 10, 03, 09, 08, 06],
   [04, 02, 01, 11, 10, 13, 07, 08, 15, 09, 12, 05, 06, 03, 00, 14],
   [11, 08, 12, 07, 01, 14, 02, 13, 06, 15, 00, 09, 10, 04, 05, 03]]
 
-sbox6 :: (Bits a, Integral a) => a -> a
+sbox6 :: Word -> Word
 sbox6 = applySbox [
   [12, 01, 10, 15, 09, 02, 06, 08, 00, 13, 03, 04, 14, 07, 05, 11],
   [10, 15, 04, 02, 07, 12, 09, 05, 06, 01, 13, 14, 00, 11, 03, 08],
   [09, 14, 15, 05, 02, 08, 12, 03, 07, 00, 04, 10, 01, 13, 11, 06],
   [04, 03, 02, 12, 09, 05, 15, 10, 11, 14, 01, 07, 06, 00, 08, 13]]
 
-sbox7 :: (Bits a, Integral a) => a -> a
+sbox7 :: Word -> Word
 sbox7 = applySbox [
   [04, 11, 02, 14, 15, 00, 08, 13, 03, 12, 09, 07, 05, 10, 06, 01],
   [13, 00, 11, 07, 04, 09, 01, 10, 14, 03, 05, 12, 02, 15, 08, 06],
   [01, 04, 11, 13, 12, 03, 07, 14, 10, 15, 06, 08, 00, 05, 09, 02],
   [06, 11, 13, 08, 01, 04, 10, 07, 09, 05, 00, 15, 14, 02, 03, 12]]
 
-sbox8 :: (Bits a, Integral a) => a -> a
+sbox8 :: Word -> Word
 sbox8 = applySbox [
   [13, 02, 08, 04, 06, 15, 11, 01, 10, 09, 03, 14, 05, 00, 12, 07],
   [01, 15, 13, 08, 10, 03, 07, 04, 12, 05, 06, 11, 00, 14, 09, 02],
@@ -323,7 +398,7 @@ sbox8 = applySbox [
 ----------------------------------------------------------------
 
 
-applyTable :: Bits a => Int -> [Int] -> a -> a
+applyTable :: Int -> [Int] -> Word -> Word
 applyTable _ [] _ = zero
 applyTable input_len (pos:xs) bits =
   let input_pos = input_len - pos
@@ -338,7 +413,7 @@ applyTable input_len (pos:xs) bits =
 -- Permutation (P)
 -- 32 bit input
 -- 32 bit output
-permutation :: Bits a => a -> a
+permutation :: Word -> Word
 permutation = applyTable 32 [
   16, 07, 20, 21, 29, 12, 28, 17,
   01, 15, 23, 26, 05, 18, 31, 10,
@@ -348,7 +423,7 @@ permutation = applyTable 32 [
 -- Expansion function (E)
 -- 32 bit input
 -- 48 bit output
-expansionFunction :: Bits a => a -> a
+expansionFunction :: Word -> Word
 expansionFunction = applyTable 32 [
   32, 01, 02, 03, 04, 05, 04, 05,
   06, 07, 08, 09, 08, 09, 10, 11,
@@ -360,7 +435,7 @@ expansionFunction = applyTable 32 [
 -- Initial permutation (IP)
 -- 64 bit input
 -- 64 bit output
-initialPermutation :: Bits a => a -> a
+initialPermutation :: Word -> Word
 initialPermutation = applyTable 64 [
   58, 50, 42, 34, 26, 18, 10, 02,
   60, 52, 44, 36, 28, 20, 12, 04,
@@ -374,7 +449,7 @@ initialPermutation = applyTable 64 [
 -- Final permutation (IP−1)
 -- 64 bit input
 -- 64 bit output
-finalPermutation :: Bits a => a -> a
+finalPermutation :: Word -> Word
 finalPermutation = applyTable 64 [
   40, 08, 48, 16, 56, 24, 64, 32,
   39, 07, 47, 15, 55, 23, 63, 31,
@@ -388,7 +463,7 @@ finalPermutation = applyTable 64 [
 -- Permuted choice 1 (PC-1)
 -- 64 bit input
 -- 56 bit output
-permutedChoice1 :: Bits a => a -> a
+permutedChoice1 :: Word -> Word
 permutedChoice1 = applyTable 64 [
   57, 49, 41, 33, 25, 17, 09, 01,
   58, 50, 42, 34, 26, 18, 10, 02,
@@ -401,7 +476,7 @@ permutedChoice1 = applyTable 64 [
 -- Permuted choice 2 (PC-2)
 -- 56 bit input
 -- 48 bit output
-permutedChoice2 :: Bits a => a -> a
+permutedChoice2 :: Word -> Word
 permutedChoice2 = applyTable 56 [
   14, 17, 11, 24, 01, 05,
   03, 28, 15, 06, 21, 10,
