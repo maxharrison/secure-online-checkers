@@ -2,7 +2,7 @@ module DES where
 
 import Binary
 import Debug.Trace
-
+import Test.HUnit
 
 type Key = Binary
 type Nonce = Binary
@@ -10,57 +10,54 @@ type Nonce = Binary
 
 
 
-plaintextTest = map (\i -> if i==1 then True else False)
-  [0, 0, 0, 1, 0, 0, 0, 1,
-   0, 0, 1, 0, 0, 0, 1, 0,
-   0, 0, 1, 1, 0, 0, 1, 1,
-   0, 1, 0, 0, 0, 1, 0, 0,
-   0, 1, 0, 1, 0, 1, 0, 1,
-   0, 1, 1, 0, 0, 1, 1, 0,
-   0, 1, 1, 1, 0, 1, 1, 1,
-   1, 0, 0, 0, 1, 0, 0, 0]
+------------------------------------------------------------------
+--                            Tests                             --
+------------------------------------------------------------------
 
-keyTest = map (\i -> if i==1 then True else False)
-  [0, 1, 1, 1, 0, 1, 0, 1,
-   0, 0, 1, 0, 1, 0, 0, 0,
-   0, 1, 1, 1, 1, 0, 0, 0,
-   0, 0, 1, 1, 1, 0, 0, 1,
-   0, 1, 1, 1, 0, 1, 0, 0,
-   1, 0, 0, 1, 0, 0, 1, 1,
-   1, 1, 0, 0, 1, 0, 1, 1,
-   0, 1, 1, 1, 0, 0, 0, 0]
+testDES :: Test
+testDES = TestList [
+  let key = map (\c -> c=='1') "0111010100101000011110000011100101110100100100111100101101110000"
+      plaintext = map (\c -> c=='1') "0001000100100010001100110100010001010101011001100111011110001000"
+      target =    map (\c -> c=='1') "1011010100100001100111101110100000011010101001110100100110011101"
+  in TestCase $ assertEqual "des failed 1" target (des key plaintext),
+  let key =       map (\c -> c=='1') "0111010100101000011110000011100101110100100100111100101101110000"
+      plaintext = map (\c -> c=='1') "0000000000000000000000000000000000000000000000000000000000000000"
+      target =    map (\c -> c=='1') "0101011001110010000111100100000010100110100110010001010010101110"
+  in TestCase $ assertEqual "des failed 2" target (des key plaintext),
+  let key =       map (\c -> c=='1') "0111010100101000011110000011100101110100100100111100101101110000"
+      plaintext = map (\c -> c=='1') "0000000000000000000000000000000000000000000000000000000000000001"
+      target =    map (\c -> c=='1') "0101010001110010010000000100000100101100110110000011101000000110"
+  in TestCase $ assertEqual "des failed 3" target (des key plaintext),
+  let key =       map (\c -> c=='1') "1101111101100001011010001110100000111010101101111001000100011110"
+      plaintext = map (\c -> c=='1') "1000111001100000110111100000101010010111111001001110111001000001"
+      target =    map (\c -> c=='1') "0000000101000101001001001101100100111111010010000010011111011001"
+  in TestCase $ assertEqual "des failed 4" target (des key plaintext),
+  let key =       map (\c -> c=='1') "1011110110001010000100011000110101101010001111101010000110000010"
+      plaintext = map (\c -> c=='1') "1000110011110110111110000011101001111100100111011000000110101111"
+      target =    map (\c -> c=='1') "1111110110000100101110111011000000101001100011000011011101000000"
+  in TestCase $ assertEqual "des failed 5" target (des key plaintext),
+  let key =       map (\c -> c=='1') "0100101101000111100010010001100001101000011100101000100000100000"
+      plaintext = map (\c -> c=='1') "0110111100011010110000111011111001010101110001001001110110101011"
+      target =    map (\c -> c=='1') "1100101110101111011001110010101110011010010010010110110100001001"
+  in TestCase $ assertEqual "des failed 6" target (des key plaintext),
+  let key =       map (\c -> c=='1') "0100101101000111100010010001100001101000011100101000100000100000"
+      plaintext = map (\c -> c=='1') "0000000000000000000000000000000000000000000000000000000000000000"
+      target =    map (\c -> c=='1') "1100010010110011011111000001110011110111000110100011100101011011"
+  in TestCase $ assertEqual "des failed 7" target (des key plaintext)]
 
-targetTest = map (\i -> if i==1 then True else False)
-  [1, 0, 1, 1, 0, 1, 0, 1,
-   0, 0, 1, 0, 0, 0, 0, 1,
-   1, 0, 0, 1, 1, 1, 1, 0,
-   1, 1, 1, 0, 1, 0, 0, 0,
-   0, 0, 0, 1, 1, 0, 1, 0,
-   1, 0, 1, 0, 0, 1, 1, 1,
-   0, 1, 0, 0, 1, 0, 0, 1,
-   1, 0, 0, 1, 1, 1, 0, 1]
- 
+tests :: Test
+tests = TestList [
+  testDES]
 
-nonce :: Nonce
-nonce = replicate 32 False--map (\c -> c == '1') "10011000011011001101110001100001"
-                              -- 10010000011001000011000001110101"
-
-main1 :: IO ()
-main1 = do
-  let ciphertext = des keyTest plaintextTest
-
-  --putStrLn $ "plaintext : " ++ showBinary plaintextTest
-  --putStrLn $ "ciphertext: " ++ showBinary ciphertext
-  print $ targetTest == ciphertext
-
-  putStrLn $ "ciphertext: " ++ (showBinary $ encrypt keyTest nonce plaintextTest)
-
+mainTest :: IO ()
+mainTest = do
+  runTestTT tests
+  putStrLn "Done"
 
 
-
-
-
-
+------------------------------------------------------------------
+--                    Encryption Functions                      --
+------------------------------------------------------------------
 
  
 encrypt :: Key -> Nonce -> Binary -> Binary
@@ -93,7 +90,6 @@ ctrBlock cipher key nonce counter binary = binary `xor` (cipher key (nonce ++ co
 
 
 
-
 des :: Key -> Binary -> Binary
 des key bits = (finalPermutation . crypt . initialPermutation) bits
   where crypt = uncurry (++) . applyKeys keys . halves
@@ -101,7 +97,7 @@ des key bits = (finalPermutation . crypt . initialPermutation) bits
 
 applyKeys :: [Key] -> (Binary, Binary) -> (Binary, Binary)
 applyKeys [] (left, right) = (right, left)
-applyKeys (key:keys) (left, right) = --trace ("c[" ++ (showBinary ((f key left))) ++ " : " ++ (show $ length keys) ++"]o")
+applyKeys (key:keys) (left, right) =
   applyKeys keys $ feistel key (left, right)
 
 
@@ -165,16 +161,11 @@ keySchedule key = subKeys shifts (left, right)
 
 subKeys :: [Int] -> (Key, Key) -> [Key]
 subKeys [] _ = []
-subKeys (shift:shifts) (left, right) = --trace (showBinary $ (uncurry (++) subKey))
+subKeys (shift:shifts) (left, right) =
   permutedChoice2 (uncurry (++) subKey) : subKeys shifts subKey
   where subKey = (left', right')
         left' = leftShift shift left
         right' = leftShift shift right
-
-        --left' = trace ("L: " ++ (showBinary $ leftShift shift left)) leftShift shift left
-        --right' = trace ("R: " ++ (showBinary $ leftShift shift right)) leftShift shift right
-
-
 
 ----------------------------------------------------------------
 --                           S-Boxes                          --

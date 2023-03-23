@@ -82,7 +82,19 @@ testDES = TestList [
   let key =       0b1101111101100001011010001110100000111010101101111001000100011110
       plaintext = 0b1000111001100000110111100000101010010111111001001110111001000001
       target =    0b0000000101000101001001001101100100111111010010000010011111011001
-  in TestCase $ assertEqual "des failed 4" target (des key plaintext)
+  in TestCase $ assertEqual "des failed 4" target (des key plaintext),
+  let key =       0b1011110110001010000100011000110101101010001111101010000110000010 
+      plaintext = 0b1000110011110110111110000011101001111100100111011000000110101111
+      target =    0b1111110110000100101110111011000000101001100011000011011101000000
+  in TestCase $ assertEqual "des failed 5" target (des key plaintext),
+  let key =       0b0100101101000111100010010001100001101000011100101000100000100000
+      plaintext = 0b0110111100011010110000111011111001010101110001001001110110101011
+      target =    0b1100101110101111011001110010101110011010010010010110110100001001
+  in TestCase $ assertEqual "des failed 6" target (des key plaintext),
+  let key =       0b0100101101000111100010010001100001101000011100101000100000100000
+      plaintext = 0b0000000000000000000000000000000000000000000000000000000000000000
+      target =    0b1100010010110011011111000001110011110111000110100011100101011011
+  in TestCase $ assertEqual "des failed 7" target (des key plaintext)
   ]
 
 testPadding :: Test
@@ -322,9 +334,15 @@ rotateHalves size n word =
 
 
 
-
 applySbox :: [[Word]] -> Word -> Word
-applySbox sbox bits = sbox !! row !! column
+applySbox sbox input = (sbox !! row) !! col
+  where
+    row = fromIntegral $ (input .&. 0x20) `shiftR` 4 .|. (input .&. 0x1)
+    col = fromIntegral $ (input .&. 0x1E) `shiftR` 1
+
+
+applySbox1 :: [[Word]] -> Word -> Word
+applySbox1 sbox bits = sbox !! row !! column
   where row = fromIntegral $ getManyBits bits [5,0]
         column = fromIntegral $ getManyBits bits [4,3,2,1]
 

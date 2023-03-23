@@ -151,30 +151,6 @@ falseParser = do
 
 --------------------
 
-type ID = String
-type AI = Bool
-data Command = Poll | Start ID AI | Move ID Route
-    deriving (Eq, Show)
-
-  
-commandParser :: Parser Command
-commandParser = do
-    stringToken "poll"
-    return Poll
-    <|> do 
-        stringToken "start"
-        space
-        id <- ident
-        ai <- boolParser
-        return (Start id ai)
-    <|> do
-        stringToken "move"
-        space
-        id <- ident
-        route <- routeParser
-        return (Move id route)
-
-
 alphanum :: Parser Char
 alphanum = sat isAlphaNum
 

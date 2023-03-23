@@ -171,7 +171,7 @@ class Checkers:
 
   def download_board(self):
     try:
-      r = requests.post('http://localhost:3000/binary', data=f'poll')
+      r = requests.post('http://localhost:3000/binary', data=f'poll {self.id}')
       plaintext = decryptDES(r.text)
       board = self.parse_board(plaintext)
       return board
@@ -187,28 +187,6 @@ class Checkers:
   def update_board(self):
     board = self.download_board()
     self.board = board if board != self.board else self.board
-
-def decryptDES1(data : str):
-  ciphertext = int(data, 2)
-  bytes = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, 'big')
-
-  print(bytes)
-
-  exit()
-  key = 0xDF6168E83AB7911E.to_bytes(8, byteorder='big')
-
-  cipher = DES.new(key, DES.MODE_ECB)
-
-  plaintext = 0x8E60DE0A97E4EE41.to_bytes(8, byteorder='big')
-  ciphertext = cipher.encrypt(plaintext)
-  print(ciphertext.hex())
-
-  decrypted_text = cipher.decrypt(ciphertext)
-  print(decrypted_text.hex())
-  exit()
-  return decrypted.decode('utf-8')
-
-
 
 def decryptDES(data : str):
   from Crypto.Cipher import DES

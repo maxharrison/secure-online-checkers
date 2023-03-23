@@ -23,12 +23,8 @@ showBinary binary = concatMap (\b -> if b then "1" else "0") binary
 
 
 -- can input hex by prepending 0x to the start of the input string
-numberToBinary :: String -> Binary
-numberToBinary = intToBinary . read 
-
--- if smaller than a byte it will get padded out to a byte
---numberToByte :: String -> Binary
---numberToByte = pad 8 . numberToBinary
+--numberToBinary :: String -> Binary
+--numberToBinary = intToBinary . read 
 
 intToBinary :: Int -> Binary
 intToBinary 0 = []
@@ -54,34 +50,19 @@ getIndexes :: [Int] -> [a] -> [a]
 getIndexes [] _ = []
 getIndexes (n:ns) xs = xs !! n : getIndexes ns xs
 
+----------------------------------------------------------------
+
 stringToBinary :: String -> Binary
 stringToBinary = concatMap charToBinary
-
-binaryToString :: Binary -> String
-binaryToString = map binaryToChar . group 8
-
 
 charToBinary :: Char -> Binary
 charToBinary = pad 8 . intToBinary . ord
 
-binaryToChar :: Binary -> Char
-binaryToChar = chr . binaryToInt
+--binaryToString :: Binary -> String
+--binaryToString = map binaryToChar . group 8
 
-
-{- stringToBinary :: String -> Binary
-stringToBinary = concatMap charToBinary
-
-charToBinary :: Char -> Binary
-charToBinary c = (pad 8) $ reverse $ go (ord c) []
-  where
-    go 0 acc = acc
-    go n acc = go (n `div` 2) ((n `mod` 2 == 1) : acc)
-
-binaryToChar :: [Bool] -> Char
-binaryToChar bs = chr $ go $ reverse $ (pad 8) bs
-  where
-    go [] = 0
-    go (b:bs) = (if b then 1 else 0) + 2 * go bs -}
+--binaryToChar :: Binary -> Char
+--binaryToChar = chr . binaryToInt
 
 
 ----------------------------------------------------------------
@@ -95,20 +76,3 @@ leftShift :: Int -> Binary -> Binary
 leftShift n xs = take (length xs) . drop n $ cycle xs
 
 
-
-----------------------------------------------------------------
-
-
-{-bitsToString :: Binary -> String
-bitsToString bs = map (intsToChar . bitsToInt) $ group 8 bs
-
-bitsToInt :: Binary -> Int
-bitsToInt [] = 0
-bitsToInt (b:bs) = b * 2^(length bs) + bitsToInt bs
-
-intsToChar :: Int -> Char
-intsToChar n | n >= 0 && n<= 9 = head $ show n
-             | n >= 10 && n<= 35 = chr $ n + 87
-             | n == 36 = ' '
-             | n == 37 = ','
-             | otherwise = chr n --error "Not valid"-}
