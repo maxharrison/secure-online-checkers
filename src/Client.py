@@ -3,6 +3,12 @@ import requests
 import string
 import random
 from Crypto.Cipher import DES
+from Crypto.Util.Padding import unpad
+from Crypto.Util import Counter
+from cryptography.hazmat.primitives.asymmetric import ec
+import binascii
+from cryptography.hazmat.primitives import serialization
+
 
 
 
@@ -18,6 +24,8 @@ class Checkers:
     self.square_size = 80
     self.num_squares = 8
     self.radius = self.square_size//3
+    self.hovered_square = None
+
 
     # Colours
     self.white_board_colour = (156,118,96,255)
@@ -27,7 +35,7 @@ class Checkers:
     self.black_colour = (0,0,0,255)
 
     # Start the game
-    self.start_game()
+    self.key = self.start_game()
 
     # Game window
     self.game_display = pygame.display.set_mode((self.board_width, self.board_height))
@@ -42,27 +50,73 @@ class Checkers:
     # Game loop
     self.loop()
 
+    
+
+
+  def intToPublicKey(self, n):
+    bytes = n.to_bytes((n.bit_length() + 7) // 8, 'big')
+    x = int.from_bytes(bytes[1:33], "big")
+    y = int.from_bytes(bytes[33:], "big")
+    numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256K1())
+    return numbers.public_key()
+
+
+  def derive_64_bit_key(self, shared_secret):
+    # Convert the shared secret to bytes
+    #secret_bytes = shared_secret.to_bytes((shared_secret.bit_length() + 7) // 8, 'big')
+
+    # Truncate the hash to 64 bits (8 bytes)
+    key_bytes = shared_secret[:8]
+
+    binary_str = ''.join(format(byte, '08b') for byte in key_bytes)
+    print(f'key: {binary_str}')
+
+    binary_str = ''.join(format(byte, '08b') for byte in shared_secret)
+    print(f'ss: {binary_str}')
+
+    return key_bytes
+    
 
 
   def start_game(self):
+    private_key = ec.generate_private_key(ec.SECP256K1())
+    public_key = private_key.public_key()
+
+    public_key_bytes = public_key.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint)
+    public_key_string = str(int.from_bytes(public_key_bytes, byteorder='big'))
+
     self.id = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
-    r = requests.post('http://localhost:3000/binary', data=f'start {self.id} True')
-    if r.status_code != 200:
+    response = requests.post('http://localhost:3000/binary', data=f'start {self.id} True {public_key_string}')
+    if response.status_code != 200:
       print('Failed to start game')
       exit()
+
+    otherPublicKey = self.intToPublicKey(int(response.text))
+
+    shared_secret = private_key.exchange(ec.ECDH(), otherPublicKey)
+    print(f'shared secret: {int.from_bytes(shared_secret, "big")}')
+
+    key = self.derive_64_bit_key(shared_secret)
+
+    return key
 
 
 
   def loop(self):
     play = True
     while play:
-      pygame.time.delay(200)
+      pygame.time.delay(25)
       for event in pygame.event.get():
         match event.type:
           case pygame.QUIT:
             play = False
 
-          # Mouse events
+          # Hover
+          case pygame.MOUSEMOTION:
+            (hx, hy) = self.get_square(event.pos)
+            self.hovered_square = (hx, hy-1)
+
+          # Mouse click
           case pygame.MOUSEBUTTONDOWN:
             if event.button == 1: # Left button
               square = self.get_square(event.pos)
@@ -112,7 +166,13 @@ class Checkers:
         x = (column * self.square_size) + self.square_size
         y = row * self.square_size
         square_colour = self.white_board_colour if (row + column) % 2 == 0 else self.green_board_colour
+
+        # Modify the color slightly if this is the hovered square
+        if self.hovered_square == (row, column):
+          square_colour = tuple(min(255, c + 30) for c in square_colour)
+
         pygame.draw.rect(self.game_display, square_colour, [x, y, self.square_size, self.square_size])
+
         # Draw pieces
         centre = (x+self.square_size/2,y+self.square_size/2)
         match self.board[row][column]:
@@ -172,7 +232,7 @@ class Checkers:
   def download_board(self):
     try:
       r = requests.post('http://localhost:3000/binary', data=f'poll {self.id}')
-      plaintext = decryptDES(r.text)
+      plaintext = self.decryptDES(r.text)
       board = self.parse_board(plaintext)
       return board
     except requests.exceptions.ConnectionError:
@@ -188,18 +248,16 @@ class Checkers:
     board = self.download_board()
     self.board = board if board != self.board else self.board
 
-def decryptDES(data : str):
-  from Crypto.Cipher import DES
-  from Crypto.Util.Padding import unpad
-  from Crypto.Util import Counter
-  ciphertext = int(data, 2)
-  bytes = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, 'big')
-  key = b'iwrsnfhl'
-  ctr = Counter.new(64, prefix=b'', initial_value=1)
-  cipher = DES.new(key, DES.MODE_CTR, counter=ctr)
-  print(len(bytes))
-  decrypted = unpad(cipher.decrypt(bytes), DES.block_size)
-  return decrypted.decode('utf-8')
+  def decryptDES(self, data : str):
+    ciphertext = int(data, 2)
+    bytes = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, 'big')
+    #key = b'iwrsnfhl'
+    ctr = Counter.new(64, prefix=b'', initial_value=1)
+    cipher = DES.new(self.key, DES.MODE_CTR, counter=ctr)
+    print(len(bytes))
+    decrypted = unpad(cipher.decrypt(bytes), DES.block_size)
+    print(decrypted.decode('utf-8'))
+    return decrypted.decode('utf-8')
 
 
     

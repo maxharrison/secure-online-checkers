@@ -156,3 +156,8 @@ alphanum = sat isAlphaNum
 
 ident :: Parser String
 ident = many alphanum
+
+natural :: Parser Integer
+natural = token $ do
+  ds <- some digit
+  return $ read ds
