@@ -1,5 +1,5 @@
 {-# language OverloadedStrings #-}
-module Main where
+module Main_old where
 
 -- Haskell modules
 import qualified Web.Scotty as S
@@ -11,7 +11,7 @@ import Network.HTTP.Types.Status (badRequest400)
 import Debug.Trace
 import Control.Applicative ((<|>))
 import qualified Data.ByteString.Lazy.Char8 as LBSC8
-import Data.Bits (testBit, shiftR, (.&.))
+import Data.Bits (testBit, shiftR)
 
 
 -- My modules
@@ -19,12 +19,9 @@ import GameState
 import Parsers
 import Valid
 import AI
-import DES_bits
+import DES
+import Binary
 import ECDH
-
-import qualified DES as D
-import qualified Binary as B
-
 
 
 -- run instructions in README.md
@@ -86,10 +83,10 @@ parseCommand s =
 --------------------------------------------------------------------------------
 
 
-derive64BitKey :: Integer -> Word
-derive64BitKey n = fromIntegral $ n .&. 0xFFFFFFFFFFFFFFFF
+derive64BitKey :: Integer -> [Bool]
+derive64BitKey n = [testBit (shiftR n 192) i | i <- [63, 62 .. 0]]
 
-ecdh :: MV.MVar GameState -> Point -> S.ActionM Word
+ecdh :: MV.MVar GameState -> Point -> S.ActionM [Bool]
 ecdh gameStateVar otherPublicKey = do
   (privateKey, publicKey) <- liftIO generateKeyPair_Secp256k1
   let shared_secret = sharedSecret_Secp256k1 privateKey otherPublicKey
@@ -97,6 +94,7 @@ ecdh gameStateVar otherPublicKey = do
   S.raw $ LBS.fromStrict $ C8BS.pack $ show $ publicKeyToInteger publicKey
   liftIO $ putStrLn $ "SS: " ++ show shared_secret
   let key = derive64BitKey shared_secret
+  liftIO $ putStrLn $ "key: " ++ showBinary key
   return key
 
 
@@ -123,7 +121,7 @@ start gameStateVar id True otherPublicKey = do
       key <- ecdh gameStateVar otherPublicKey
       liftIO $ MV.modifyMVar_ gameStateVar (\gs -> return gs {
         whiteID = Just id,
-        whiteKey = key,
+        --whiteKey = key,
         blackID = Just "AI",
         ai = True,
         started = True})
@@ -231,7 +229,7 @@ move gameStateVar player route = do
       -- Send the updated board to the client
       sendBoard gameStateVar currentPlayer
 
-      -- Proceed with either an AI move or the next player's move
+        -- Proceed with either an AI move or the next player's move
       if ai
         then moveAI gameStateVar
         else nextPlayer gameStateVar
@@ -266,14 +264,7 @@ checkCurrentPlayer gameStateVar maybePlayer = do
 ----------------------------------------------------------------
 
 poll :: MV.MVar GameState -> Player -> S.ActionM ()
-poll gameStateVar player = do
-  board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
-  S.setHeader "Content-Type" "application/octet-stream"
-  case ((length $ getAllValidBoardsRoutes board White), (length $ getAllValidBoardsRoutes board Black)) of
-        (0, 0) -> S.raw $ LBS.fromStrict $ C8BS.pack "draw"
-        (0, _) -> S.raw $ LBS.fromStrict $ C8BS.pack "black wins"
-        (_, 0) -> S.raw $ LBS.fromStrict $ C8BS.pack "white wins"
-        _      -> sendBoard gameStateVar player
+poll gameStateVar player = sendBoard gameStateVar player
 
 sendBoard :: MV.MVar GameState -> Player -> S.ActionM ()
 sendBoard gameStateVar player = do
@@ -285,10 +276,10 @@ sendData :: MV.MVar GameState -> Player -> String -> S.ActionM ()
 sendData gameStateVar player string = do
   let playerKey = if player == White then GameState.whiteKey else GameState.blackKey
   key <- liftIO $ playerKey <$> MV.readMVar gameStateVar
-  liftIO $ putStrLn $ showBinary key
-  let nonce = 0
-  let ciphertext = encrypt key nonce (stringToBytes string)
-  let ciphertextString = showBytes ciphertext
+  let nonce = replicate 32 False
+  let ciphertext = (encrypt key nonce. stringToBinary) string
+  let ciphertextString = showBinary ciphertext
+  liftIO $ putStrLn $ ciphertextString
   S.setHeader "Content-Type" "application/octet-stream"
   S.raw $ LBS.fromStrict $ C8BS.pack ciphertextString
 
@@ -303,13 +294,13 @@ main = do
 
   -- initialise the state mvar
   gameStateVar <- MV.newMVar GameState {
-    board = smallBoard,
+    board = startBoard,
     currentPlayer = White,
     started = False,
     whiteID = Nothing,
-    whiteKey = 0,
+    whiteKey = map (\c -> c=='1') "0110100101110111011100100111001101101110011001100110100001101100",
     blackID = Nothing,
-    blackKey = 0,
+    blackKey = map (\c -> c=='1') "0110100101110111011100100111001101101110011001100110100001101100",
     ai = False
   }
 
@@ -322,7 +313,7 @@ main = do
     -- curl -X POST -H "Content-Type: application/octet-stream" --data-binary $'poll' localhost:3000/binary
     S.post "/binary" $ do
       body <- S.body
-      --liftIO $ putStrLn $ "body: " ++ show body
+      liftIO $ putStrLn $ "body: " ++ show body
 
       case parseCommand $ C8BS.unpack (LBS.toStrict body) of
 
@@ -347,8 +338,3 @@ main = do
           case (checkStarted, playerWhoIsConnected, checkCurrentPlayer) of
             (True, Just p, True)  -> move gameStateVar p route
             otherwise             -> S.status badRequest400
-
-
-
-
-

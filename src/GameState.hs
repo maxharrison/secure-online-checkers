@@ -23,9 +23,11 @@ data GameState = GameState {
   currentPlayer :: Player,
   started       :: Bool,
   whiteID       :: Maybe String,
-  whiteKey      :: [Bool],
+  whiteKey      :: Word,
+  --whiteKey      :: [Bool],
   blackID       :: Maybe String,
-  blackKey      :: [Bool],
+  blackKey      :: Word,
+  --blackKey      :: [Bool],
   ai            :: Bool
 }
 

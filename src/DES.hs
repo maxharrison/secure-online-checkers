@@ -117,7 +117,7 @@ padPKCS7 :: Binary -> Binary
 padPKCS7 binary
   | l `mod` 8 /= 0 = error "Has to be in bytes"
   | l `mod` 64 == 0 = binary ++ (concat $ replicate 8 (pad 8 $ intToBinary $ 8))
-  | otherwise = binary ++ padding
+  | otherwise = trace ("B: " ++ (showBinary binary) ++ " : " ++ (showBinary padding)) binary ++ padding
     where l = length binary
           n = ((64 - (l `mod` 64)) `mod` 64) `div` 8
           x = (pad 8 . intToBinary) n

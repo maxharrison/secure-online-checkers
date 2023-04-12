@@ -4,135 +4,7 @@ import Debug.Trace
 import Data.Word
 import Data.Bits 
 import Data.Char
-import Test.HUnit
 import Numeric (showIntAtBase)
-
-
-------------------------------------------------------------------
---                            Tests                             --
-------------------------------------------------------------------
-
-{- key1 :: Key
-key1 = 0b0111010100101000011110000011100101110100100100111100101101110000
-
-
-
-
-
-
-
-plaintextTestWords :: [Word]
-plaintextTestWords = [
-  0b00010001,
-  0b00100010,
-  0b00110011,
-  0b01000100,
-  0b01010101,
-  0b01100110,
-  0b01110111,
-  0b10001001]
-
-plaintextTest :: Word
-plaintextTest =
-  0b0001000100100010001100110100010001010101011001100111011110001000
-
-keyTest :: Word
-keyTest =
-  0b0111010100101000011110000011100101110100100100111100101101110000
-
-targetTest :: Word
-targetTest =
-  0b1011010100100001100111101110100000011010101001110100100110011101
-
-nonceTest :: Nonce
-nonceTest = zeroBits
- -}
---main :: IO ()
---main = do
---  let ciphertextTest = des keyTest plaintextTest
-  --putStrLn $ "plaintext : " ++ showBinary plaintextTest
-  --putStrLn $ "ciphertext: " ++ showBinary ciphertextTest
---  print $ targetTest == ciphertextTest
-
---  print $ (padPKCS7 64 plaintextTestWords)
-
- -- print $ map showBinary $ counterMode keyTest nonceTest (padPKCS7 64 plaintextTestWords)
-
---  print $ map showBinary $ encrypt keyTest nonceTest plaintextTestWords
-  --putStrLn $ "ciphertext: " ++ (showBinary $ ungroup 8 $ encrypt keyTest nonceTest plaintextTestWords)
-  --putStrLn $ "decerypted: " ++ (showBinary $ ungroup 8 $ decrypt keyTest nonceTest (encrypt keyTest nonceTest plaintextTestWords))
-
-
-
-
-testDES :: Test
-testDES = TestList [
-  let key =       0b0111010100101000011110000011100101110100100100111100101101110000
-      plaintext = 0b0001000100100010001100110100010001010101011001100111011110001000
-      target =    0b1011010100100001100111101110100000011010101001110100100110011101
-  in TestCase $ assertEqual "des failed 1" target (des key plaintext),
-  let key =       0b0111010100101000011110000011100101110100100100111100101101110000
-      plaintext = 0b0000000000000000000000000000000000000000000000000000000000000000
-      target =    0b0101011001110010000111100100000010100110100110010001010010101110
-  in TestCase $ assertEqual "des failed 2" target (des key plaintext),
-  let key =       0b0111010100101000011110000011100101110100100100111100101101110000
-      plaintext = 0b0000000000000000000000000000000000000000000000000000000000000001
-      target =    0b0101010001110010010000000100000100101100110110000011101000000110
-  in TestCase $ assertEqual "des failed 3" target (des key plaintext),
-  let key =       0b1101111101100001011010001110100000111010101101111001000100011110
-      plaintext = 0b1000111001100000110111100000101010010111111001001110111001000001
-      target =    0b0000000101000101001001001101100100111111010010000010011111011001
-  in TestCase $ assertEqual "des failed 4" target (des key plaintext),
-  let key =       0b1011110110001010000100011000110101101010001111101010000110000010 
-      plaintext = 0b1000110011110110111110000011101001111100100111011000000110101111
-      target =    0b1111110110000100101110111011000000101001100011000011011101000000
-  in TestCase $ assertEqual "des failed 5" target (des key plaintext),
-  let key =       0b0100101101000111100010010001100001101000011100101000100000100000
-      plaintext = 0b0110111100011010110000111011111001010101110001001001110110101011
-      target =    0b1100101110101111011001110010101110011010010010010110110100001001
-  in TestCase $ assertEqual "des failed 6" target (des key plaintext),
-  let key =       0b0100101101000111100010010001100001101000011100101000100000100000
-      plaintext = 0b0000000000000000000000000000000000000000000000000000000000000000
-      target =    0b1100010010110011011111000001110011110111000110100011100101011011
-  in TestCase $ assertEqual "des failed 7" target (des key plaintext)
-  ]
-
-testPadding :: Test
-testPadding = TestList [
-  padPKCS7 8 (stringToBytes "YELLOWS") ~?= (stringToBytes "YELLOWS" ++ replicate 1 1),
-  padPKCS7 8 (stringToBytes "YELLOWSU") ~?= (stringToBytes "YELLOWSU" ++ replicate 8 8),
-  padPKCS7 16 (stringToBytes "YELLOWSUBMARINE") ~?= (stringToBytes "YELLOWSUBMARINE" ++ replicate 1 1),
-  padPKCS7 16 (stringToBytes "YELLOWSUBMARINE!") ~?= (stringToBytes "YELLOWSUBMARINE!" ++ replicate 16 16),
-  unpadPKCS7 (stringToBytes "YELLOWSUBMARINE!" ++ replicate 16 16) ~?= (stringToBytes "YELLOWSUBMARINE!")]
-
-testCounterMode :: Test
-testCounterMode = 
-  let key = 0b0111010100101000011110000011100101110100100100111100101101110000
-      nonce = 0b0000000000000000000000000000000000000000000000000000000000000000
-      plaintext = [0b00010001,0b00100010,0b00110011,0b01000100,0b01010101,0b01100110,0b01110111,0b10001000]
-
-      target = [0b01000111,0b01010000,0b00101101,0b00000100,0b11110011,0b11111111,0b01100011,0b00100110,
-                0b01011100,0b01111010,0b01001000,0b01001001,0b00100100,0b11010000,0b00110010,0b00001110]
-  in TestCase $ assertEqual "ctr failed" target (counterMode key nonce $ padPKCS7 8 plaintext)
-
-tests :: Test
-tests = TestList [
-  testDES,
-  testPadding]
-
-main :: IO ()
-main = do
-  runTestTT tests
-  putStrLn "Done"
-
-
-
-
-
-
-
-
-
 
 
 
@@ -159,6 +31,14 @@ unhalves size (left, right) = (right .|. (left `shiftL` half_size)) .&. mask siz
     where half_size = size `div` 2
 
 -- same as with ungroup with the types
+groupNew :: Int -> Int -> Word -> [Word]
+groupNew outputSize inputSize x =
+  let n = inputSize `div` outputSize
+      distances = map ((*) outputSize) [0..(n-1)]
+  in reverse $ [(x `shiftR` distance) .&. (mask outputSize) | distance <- distances]
+
+-- same as with ungroup with the types
+-- does not always work - when the end of the input is zeros, it will think its at the end
 group :: Bits a => Int -> a -> [a]
 group size x
   | popCount x == 0 = []
@@ -202,6 +82,14 @@ chunks n xs = take n xs : chunks n (drop n xs)
 
 showBinary b = showIntAtBase 2 intToDigit b ""
 
+showByte :: Word -> String
+showByte b =
+  let string = showIntAtBase 2 intToDigit b ""
+  in replicate (8-(length string)) '0' ++ string
+
+showBytes :: [Word] -> String
+showBytes = concatMap showByte
+
 ------------------------------------------------------------------
 --                 Encrypt/Decrypt Functions                    --
 ------------------------------------------------------------------
@@ -243,6 +131,18 @@ unpadPKCS7 bytes = take len bytes
 --                      CTR - Counter Mode                      --
 ------------------------------------------------------------------
 
+
+{- ctrMode :: (Key -> Binary -> Binary) -> Key -> Nonce -> Binary -> Binary
+ctrMode cipher key nonce binary =
+  concat [ctrBlock cipher key nonce counter block | (counter, block) <- zip counters blocks]
+    where counters = [(pad 32 . intToBinary) n | n <- [1..]]
+          blocks = group 64 binary
+          len = length blocks
+
+ctrBlock :: (Key -> Binary -> Binary) -> Key -> Nonce -> Binary -> Binary -> Binary
+ctrBlock cipher key nonce counter binary = binary `xor` (cipher key (nonce ++ counter))
+ -}
+
 --ctrMode :: (Key -> Word -> Word) -> Key -> Nonce -> [Word] -> [Word]
 --ctrMode cipher key nonce bytes =
 --  concat [ctrBlock cipher key nonce counter block | (counter, block) <- zip counters blocks]
@@ -258,7 +158,7 @@ unpadPKCS7 bytes = take len bytes
 --          block = ungroup 64 (bytes)
 
 --ciphertextTest = des keyTest plaintextTest
-counterMode :: Key -> Nonce -> [Word] -> [Word]
+{- counterMode :: Key -> Nonce -> [Word] -> [Word]
 counterMode key nonce bytes = 
   let blocks = map (ungroup 8) (chunks 8 bytes)
       block_len = length blocks
@@ -266,6 +166,31 @@ counterMode key nonce bytes =
       key_stream_blocks = map (des key) counter_blocks
   in concatMap (\(b,k) -> group 8 (b `xor` k)) $ zip blocks key_stream_blocks
     --trace (" -|S " ++ show (length $ bytes) ++ " E|- ") [block `xor` key_stream | (block, key_stream) <- zip blocks key_stream_blocks]
+ -}
+
+-- gets list of bytes, and returns lists of 64 bit word blocks
+getBlocks :: [Word] -> [Word]
+getBlocks bytes = map (ungroup 8) (chunks 8 bytes)
+
+mergeCounterBlock :: Nonce -> Int -> Word
+mergeCounterBlock nonce counter =
+  (nonce `shiftL` 32) .|. (fromIntegral counter)
+
+word64ToBytes :: Word -> [Word]
+word64ToBytes w = [w `shiftR` (8 * i) .&. 0xFF | i <- [7,6..0]]
+
+words64ToBytes :: [Word] -> [Word]
+words64ToBytes ws = concatMap word64ToBytes ws
+
+counterMode :: Key -> Nonce -> [Word] -> [Word]
+counterMode key nonce bytes =
+  let blocks = getBlocks bytes
+      counter_blocks = [mergeCounterBlock nonce counter | counter <- [1..]]
+      key_stream_blocks = map (des key) counter_blocks
+      encrypted_blocks = zipWith xor blocks key_stream_blocks
+      encrypted_bytes = words64ToBytes encrypted_blocks
+  in encrypted_bytes
+
 
 
 
@@ -275,7 +200,7 @@ counterMode key nonce bytes =
 
 
 des :: Key -> Word -> Word
-des key bits = (finalPermutation . crypt . initialPermutation) bits --trace (" |k: " ++ showBinary key ++ " b: " ++ showBinary bits ++ " r: " ++ showBinary ((finalPermutation . crypt . initialPermutation) bits)) (finalPermutation . crypt . initialPermutation) bits
+des key bits = (finalPermutation . crypt . initialPermutation) bits
   where keys = keySchedule key
         crypt = unhalves 64 . applyKeys keys . halves 64
 
@@ -299,7 +224,7 @@ f :: Key -> Word -> Word
 f key = permutation . sboxes . (xor key) . expansionFunction
 
 sboxes :: Word -> Word
-sboxes = ungroup 4 . zipWith ($) boxes . group 6
+sboxes = ungroup 4 . zipWith ($) boxes . groupNew 6 48
   where boxes = [sbox1, sbox2, sbox3, sbox4,
                  sbox5, sbox6, sbox7, sbox8]
 
@@ -341,10 +266,10 @@ applySbox sbox input = (sbox !! row) !! col
     col = fromIntegral $ (input .&. 0x1E) `shiftR` 1
 
 
-applySbox1 :: [[Word]] -> Word -> Word
-applySbox1 sbox bits = sbox !! row !! column
-  where row = fromIntegral $ getManyBits bits [5,0]
-        column = fromIntegral $ getManyBits bits [4,3,2,1]
+--applySbox1 :: [[Word]] -> Word -> Word
+--applySbox1 sbox bits = sbox !! row !! column
+--  where row = fromIntegral $ getManyBits bits [5,0]
+--        column = fromIntegral $ getManyBits bits [4,3,2,1]
 
 getManyBits :: Word -> [Int] -> Word
 getManyBits _ [] = zero

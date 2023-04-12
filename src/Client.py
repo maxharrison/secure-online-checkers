@@ -6,8 +6,9 @@ from Crypto.Cipher import DES
 from Crypto.Util.Padding import unpad
 from Crypto.Util import Counter
 from cryptography.hazmat.primitives.asymmetric import ec
-import binascii
 from cryptography.hazmat.primitives import serialization
+import time
+import threading
 
 
 
@@ -36,6 +37,8 @@ class Checkers:
 
     # Start the game
     self.key = self.start_game()
+    self.play = True
+
 
     # Game window
     self.game_display = pygame.display.set_mode((self.board_width, self.board_height))
@@ -47,11 +50,17 @@ class Checkers:
     self.update_board()
     self.draw_board()
 
+    update_thread = threading.Thread(target=self.update_board_loop)
+    update_thread.start()
+
     # Game loop
     self.loop()
 
     
-
+  def update_board_loop(self):
+    while self.play:
+      self.update_board()
+      time.sleep(1)  # Adjust the sleep time to control the update frequency
 
   def intToPublicKey(self, n):
     bytes = n.to_bytes((n.bit_length() + 7) // 8, 'big')
@@ -66,7 +75,7 @@ class Checkers:
     #secret_bytes = shared_secret.to_bytes((shared_secret.bit_length() + 7) // 8, 'big')
 
     # Truncate the hash to 64 bits (8 bytes)
-    key_bytes = shared_secret[:8]
+    key_bytes = shared_secret[-8:]
 
     binary_str = ''.join(format(byte, '08b') for byte in key_bytes)
     print(f'key: {binary_str}')
@@ -103,13 +112,12 @@ class Checkers:
 
 
   def loop(self):
-    play = True
-    while play:
+    while self.play:
       pygame.time.delay(25)
       for event in pygame.event.get():
         match event.type:
           case pygame.QUIT:
-            play = False
+            self.play = False
 
           # Hover
           case pygame.MOUSEMOTION:
@@ -131,7 +139,6 @@ class Checkers:
                 self.route = []
 
       # Redraw the board
-      self.update_board()
       self.draw_board()
       pygame.display.update()
 
@@ -148,6 +155,8 @@ class Checkers:
         data += ','
     print(data)
     r = requests.post('http://localhost:3000/binary', data=data)
+
+
 
 
   def route_string(self):
@@ -171,6 +180,9 @@ class Checkers:
         if self.hovered_square == (row, column):
           square_colour = tuple(min(255, c + 30) for c in square_colour)
 
+        if (row, column+1) in self.route:
+          square_colour = tuple(min(255, c + 30) for c in square_colour)
+
         pygame.draw.rect(self.game_display, square_colour, [x, y, self.square_size, self.square_size])
 
         # Draw pieces
@@ -186,6 +198,7 @@ class Checkers:
           case 'B':
             pygame.draw.circle(self.game_display, self.red_piece_colour, centre, self.radius)
             self.draw_text('K', self.black_colour, 45, x, y+3)
+
 
     for i in range(self.num_squares):
       # Draw numbers
@@ -216,6 +229,7 @@ class Checkers:
     self.draw_text(self.route_string(), self.white_piece_colour, 32, x, y)
 
 
+
   def draw_text(self, text, colour, size, x, y):
     font = pygame.font.Font(None, size)
     text_surface = font.render(text, True, colour)
@@ -232,9 +246,21 @@ class Checkers:
   def download_board(self):
     try:
       r = requests.post('http://localhost:3000/binary', data=f'poll {self.id}')
-      plaintext = self.decryptDES(r.text)
-      board = self.parse_board(plaintext)
-      return board
+
+      if r.text == "":
+        print("INVALID ROUTE")
+      elif r.text == "draw":
+        self.play = False
+      elif r.text == "white wins":
+        self.play = False
+      elif r.text == "black wins":
+        self.play = False
+      else:
+        plaintext = self.decryptDES(r.text)
+        board = self.parse_board(plaintext)
+        return board
+      self.gameFinished()
+      return self.board
     except requests.exceptions.ConnectionError:
       print('Error: could not connect to server')
       return self.board
@@ -251,13 +277,27 @@ class Checkers:
   def decryptDES(self, data : str):
     ciphertext = int(data, 2)
     bytes = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, 'big')
-    #key = b'iwrsnfhl'
     ctr = Counter.new(64, prefix=b'', initial_value=1)
     cipher = DES.new(self.key, DES.MODE_CTR, counter=ctr)
+    #cipher = DES.new(b'iwrsnfhl', DES.MODE_CTR, counter=ctr)
     print(len(bytes))
     decrypted = unpad(cipher.decrypt(bytes), DES.block_size)
     print(decrypted.decode('utf-8'))
     return decrypted.decode('utf-8')
+  
+  def gameFinished(self):
+    wp = sum(item == 'w' for row in self.board for item in row)
+    wk = sum(item == 'W' for row in self.board for item in row)
+    w = wp + wk
+    bp = sum(item == 'b' for row in self.board for item in row)
+    bk = sum(item == 'B' for row in self.board for item in row)
+    b = bp + bk
+    if w > b:
+      print("White Wins!")
+    elif b > w:
+      print("Black Wins!")
+    else:
+      print("Draw!")
 
 
     
