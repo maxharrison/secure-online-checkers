@@ -9,9 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
 import time
 import threading
-
-
-
+import secrets
 
 
 
@@ -36,8 +34,12 @@ class Checkers:
     self.black_colour = (0,0,0,255)
 
     # Start the game
-    self.key = self.start_game()
+    self.winner = "P"
     self.play = True
+    self.ai = True
+    self.player = ""
+    self.nonce = b''
+    self.key = self.start_game()
 
 
     # Game window
@@ -59,35 +61,32 @@ class Checkers:
     
   def update_board_loop(self):
     while self.play:
-      self.update_board()
       time.sleep(1)  # Adjust the sleep time to control the update frequency
-
-  def intToPublicKey(self, n):
-    bytes = n.to_bytes((n.bit_length() + 7) // 8, 'big')
-    x = int.from_bytes(bytes[1:33], "big")
-    y = int.from_bytes(bytes[33:], "big")
-    numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256K1())
-    return numbers.public_key()
+      self.update_board()
+      if self.winner != "P":
+        self.play = False
+        if self.winner == "W":
+          print("White Wins")
+        elif self.winner == "B":
+          print("Black Wins")
+        elif self.winner == "D":
+          print("Draw")
 
 
   def derive_64_bit_key(self, shared_secret):
-    # Convert the shared secret to bytes
-    #secret_bytes = shared_secret.to_bytes((shared_secret.bit_length() + 7) // 8, 'big')
-
     # Truncate the hash to 64 bits (8 bytes)
     key_bytes = shared_secret[-8:]
-
-    binary_str = ''.join(format(byte, '08b') for byte in key_bytes)
-    print(f'key: {binary_str}')
-
-    binary_str = ''.join(format(byte, '08b') for byte in shared_secret)
-    print(f'ss: {binary_str}')
 
     return key_bytes
     
 
-
   def start_game(self):
+    if input("Would you like to play against an AI? (y/n)" ) == 'y':
+      self.ai = True
+    else:
+      self.ai = False
+
+
     private_key = ec.generate_private_key(ec.SECP256K1())
     public_key = private_key.public_key()
 
@@ -95,20 +94,28 @@ class Checkers:
     public_key_string = str(int.from_bytes(public_key_bytes, byteorder='big'))
 
     self.id = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
-    response = requests.post('http://localhost:3000/binary', data=f'start {self.id} True {public_key_string}')
+    response = requests.post('http://localhost:3000/binary', data=f'start {self.id} {self.ai} {public_key_string}')
     if response.status_code != 200:
       print('Failed to start game')
       exit()
 
-    otherPublicKey = self.intToPublicKey(int(response.text))
+    other_public_key = self.bytes_to_public_key(response.content)
 
-    shared_secret = private_key.exchange(ec.ECDH(), otherPublicKey)
-    print(f'shared secret: {int.from_bytes(shared_secret, "big")}')
+    shared_secret = private_key.exchange(ec.ECDH(), other_public_key)
 
     key = self.derive_64_bit_key(shared_secret)
 
     return key
 
+  def bytes_to_public_key(self, public_key_bytes):
+    header = public_key_bytes[0]
+    if header != 4:
+      print(public_key_bytes)
+      raise ValueError("Invalid public key format")
+    x = int.from_bytes(public_key_bytes[1:33], "big")
+    y = int.from_bytes(public_key_bytes[33:], "big")
+    numbers = ec.EllipticCurvePublicNumbers(x, y, ec.SECP256K1())
+    return numbers.public_key()
 
 
   def loop(self):
@@ -156,9 +163,6 @@ class Checkers:
     print(data)
     r = requests.post('http://localhost:3000/binary', data=data)
 
-
-
-
   def route_string(self):
     route = ""
     for square in self.route:
@@ -168,6 +172,7 @@ class Checkers:
     return route
           
   def draw_board(self):
+    pygame.display.set_caption(f'Checkers - {self.player}')
     self.game_display.fill(self.black_colour)
     for row in range(self.num_squares):
       for column in range(self.num_squares):
@@ -228,8 +233,6 @@ class Checkers:
     y = 9 * self.square_size
     self.draw_text(self.route_string(), self.white_piece_colour, 32, x, y)
 
-
-
   def draw_text(self, text, colour, size, x, y):
     font = pygame.font.Font(None, size)
     text_surface = font.render(text, True, colour)
@@ -244,28 +247,21 @@ class Checkers:
     return row, column
 
   def download_board(self):
+    self.nonce = secrets.token_bytes(4)
+    nonceNumber = int.from_bytes(self.nonce, 'big')
     try:
-      r = requests.post('http://localhost:3000/binary', data=f'poll {self.id}')
-
-      if r.text == "":
-        print("INVALID ROUTE")
-      elif r.text == "draw":
-        self.play = False
-      elif r.text == "white wins":
-        self.play = False
-      elif r.text == "black wins":
-        self.play = False
-      else:
-        plaintext = self.decryptDES(r.text)
-        board = self.parse_board(plaintext)
-        return board
-      self.gameFinished()
-      return self.board
+      r = requests.post('http://localhost:3000/binary', data=f'poll {self.id} {nonceNumber}', headers={'Content-Type': 'text/plain'})
+      plaintext = self.decryptDES(r.content)
+      board = self.parse_board(plaintext)
+      return board
+      
     except requests.exceptions.ConnectionError:
       print('Error: could not connect to server')
       return self.board
 
   def parse_board(self, board_str):
+    self.player = board_str[:5]
+    self.winner = board_str[6:7]
     lines = board_str.split('\n')
     board = [row.split(' ')[1:-1] for row in lines[2:10]]
     return board
@@ -274,15 +270,10 @@ class Checkers:
     board = self.download_board()
     self.board = board if board != self.board else self.board
 
-  def decryptDES(self, data : str):
-    ciphertext = int(data, 2)
-    bytes = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, 'big')
-    ctr = Counter.new(64, prefix=b'', initial_value=1)
+  def decryptDES(self, data: bytes):
+    ctr = Counter.new(32, prefix=self.nonce, initial_value=1)
     cipher = DES.new(self.key, DES.MODE_CTR, counter=ctr)
-    #cipher = DES.new(b'iwrsnfhl', DES.MODE_CTR, counter=ctr)
-    print(len(bytes))
-    decrypted = unpad(cipher.decrypt(bytes), DES.block_size)
-    print(decrypted.decode('utf-8'))
+    decrypted = unpad(cipher.decrypt(data), DES.block_size)
     return decrypted.decode('utf-8')
   
   def gameFinished(self):
@@ -297,13 +288,7 @@ class Checkers:
     elif b > w:
       print("Black Wins!")
     else:
-      print("Draw!")
+      print("Game over!")
 
-
-    
 
 checkers = Checkers()
-
-
-
-
