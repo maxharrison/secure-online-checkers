@@ -2,3 +2,5 @@
 /results
 *.hi
 *.o
+.stack-work
+OLD.stack-work

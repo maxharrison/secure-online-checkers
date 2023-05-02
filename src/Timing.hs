@@ -1,3 +1,5 @@
+module Timing where
+
 import ECDH
 import DES
 import System.CPUTime
