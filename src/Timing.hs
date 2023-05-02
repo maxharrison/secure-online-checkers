@@ -1,6 +1,6 @@
 module Timing where
 
-import ECDH
+{- import ECDH
 import DES
 import System.CPUTime
 import System.Random
@@ -98,7 +98,7 @@ desTiming = do
   let avgTime = sum times / fromIntegral runs
 
   -- Print the average time taken
-  putStrLn ("Average time taken: " ++ show avgTime ++ " seconds")
+  putStrLn ("Average time taken: " ++ show avgTime ++ " seconds") -}
 
 
 

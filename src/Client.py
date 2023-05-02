@@ -16,6 +16,9 @@ import secrets
 class Checkers:
   def __init__(self):
     pygame.init()
+
+    print("What is the ip address of the server? ")
+    self.ip = input()
     
     # sizes
     self.board_height = 800
@@ -94,7 +97,7 @@ class Checkers:
     public_key_string = str(int.from_bytes(public_key_bytes, byteorder='big'))
 
     self.id = ''.join(random.choice(string.ascii_lowercase) for i in range(8))
-    response = requests.post('http://localhost:3000/binary', data=f'start {self.id} {self.ai} {public_key_string}')
+    response = requests.post(f'http://{self.ip}:3000/binary', data=f'start {self.id} {self.ai} {public_key_string}')
     if response.status_code != 200:
       print('Failed to start game')
       exit()
