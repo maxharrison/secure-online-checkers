@@ -10,8 +10,9 @@ import qualified Data.ByteString as BS
 import Data.ByteString (ByteString)
 
 
-
-
+----------------------------------------------------------------
+--                         Types                              --
+----------------------------------------------------------------
 
 -- Point data type represents a point on the elliptic curve.
 -- The first Integer represents the x-coordinate of the point.
@@ -22,60 +23,63 @@ data Point = Point Integer Integer | Infinity
 -- Curve data type represents an elliptic curve.
 -- The first Integer represents the 'a' coefficient of the curve equation: y^2 = x^3 + ax + b.
 -- The second Integer represents the 'b' coefficient of the curve equation: y^2 = x^3 + ax + b.
--- The third Integer represents the prime field characteristic (modulus) used for arithmetic operations on the curve.
--- The Point represents the generator point G
--- The fourth Integer represents the order of the generator group
+-- The third Integer represents the prime field modulus used for arithmetic operations on the curve.
+-- The Point represents the generator point G.
+-- The fourth Integer represents the order of the generator group.
 data Curve = Curve Integer Integer Integer Point Integer
   deriving (Eq, Show)
 
-
-
---------------------------------------------------------------------------------
---                              Curve Functions                               --
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+--                      Curve Functions                       --
+----------------------------------------------------------------
 
 infinityPoint :: Point
 infinityPoint = Infinity
 
 add :: Curve -> Point -> Point -> Point
+-- If either points are infinity, return the other point.
 add _ p Infinity = p
 add _ Infinity q = q
+-- If neither points are infinity.
 add (Curve a _ p _ _) (Point x1 y1) (Point x2 y2) =
   case modInverse bottom p of
+    -- Given the inverse, construct point as per the equation.
     Just inv -> let s = (top * inv) `mod` p
                     x3 = ((s * s) - x1 - x2) `mod` p
                     y3 = (s * (x1 - x3) - y1) `mod` p
                 in Point x3 y3
+    -- If there is not inverse, then return infinity.
     Nothing -> Infinity
+  -- Equivlent to constructing the two different cases of S.
   where
     (top, bottom) =
       if not (x1 == x2 && y1 == y2)
-      then ((y2 - y1) `mod` p, (x2 - x1) `mod` p)
-      else ((3 * x1 * x1 + a) `mod` p, (2 * y1) `mod` p)
+        then ((y2 - y1) `mod` p, (x2 - x1) `mod` p)
+        else ((3 * x1 * x1 + a) `mod` p, (2 * y1) `mod` p)
 
 
 double :: Curve -> Point -> Point
 double curve point = add curve point point
 
-
 multiply :: Curve -> Integer -> Point -> Point
+-- This is the base case for the function.
 multiply _ 0 _ = Infinity
+-- This is the main function defintion.
 multiply curve n point
   | point == Infinity = Infinity
-  | otherwise = go curve point n
+  | otherwise = doubleAdd curve point n
   where
-    go _ _ 0 = Infinity
-    go curve point n
-      | n `mod` 2 == 1 = add curve point (go curve (double curve point) (n `div` 2))
-      | otherwise = go curve (double curve point) (n `div` 2)
+    -- The double and add algorithm.
+    doubleAdd _ _ 0 = Infinity
+    doubleAdd curve point n
+      | n `mod` 2 == 1 = add curve point (doubleAdd curve (double curve point) (n `div` 2))
+      | otherwise      = doubleAdd curve (double curve point) (n `div` 2)
 
 
 
---------------------------------------------------------------------------------
---                  Extended Euclidean Algorithm & Inverse                    --
---------------------------------------------------------------------------------
-
-
+----------------------------------------------------------------
+--           Extended Euclidean Algorithm & Inverse           --
+----------------------------------------------------------------
 
 {- Understanding Cryptography - Christof Parr & Jan Pelzl (page 162) 
 s0 = 1, t0 = 0,
@@ -97,20 +101,22 @@ return
 eea :: Integer -> Integer -> (Integer, Integer, Integer)
 eea r0 r1
   | r1 == 0 = (r0, 1, 0)
-  | otherwise = (g, t, s - t * q)
-    where (g, s, t) = eea r1 (r0 `mod` r1)
-          q = r0 `div` r1
+  | otherwise =
+    let (g, s, t) = eea r1 (r0 `mod` r1)
+        q = r0 `div` r1
+    in (g, t, s - t * q)
 
 modInverse :: Integer -> Integer -> Maybe Integer
-modInverse a modulus
-  | g == 1 = Just (s `mod` modulus)
-  | otherwise = Nothing
-    where (g, s, _) = eea a modulus
+modInverse a modulus =
+  let (g, s, _) = eea a modulus
+  in if g == 1
+       then Just (s `mod` modulus)
+       else Nothing
 
 
---------------------------------------------------------------------------------
---                                 Secp256k1                                  --
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+--                         Secp256k1                          --
+----------------------------------------------------------------
 
 -- According to bitcoin.it/wiki/Secp256k1
 -- a = 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
@@ -137,8 +143,6 @@ generator_Secp256k1 = Point
   0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
   0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
 
-
-
 generateKeyPair_Secp256k1 :: IO (Integer, Point)
 generateKeyPair_Secp256k1 = generateKeyPair curve_Secp256k1
 
@@ -146,9 +150,9 @@ sharedSecret_Secp256k1 :: Integer -> Point -> Integer
 sharedSecret_Secp256k1 = sharedSecret curve_Secp256k1
  
 
---------------------------------------------------------------------------------
---                              Format Conversion                             --
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+--                    Format Conversion                       --
+----------------------------------------------------------------
 
 integerToPublicKey :: Integer -> Maybe Point
 integerToPublicKey n =
@@ -159,7 +163,6 @@ integerToPublicKey n =
           in Just $ Point x y
      else Nothing
 
-
 publicKeyToInteger :: Point -> Integer
 publicKeyToInteger (Point x y) =
   let start = 0x04 `shiftL` 512
@@ -168,12 +171,9 @@ publicKeyToInteger (Point x y) =
   in start .|. xComponent .|. yComponent
 
 
---------------------------------------------------------------------------------
---                                    ECDH                                    --
---------------------------------------------------------------------------------
-
-
-
+----------------------------------------------------------------
+--                            ECDH                            --
+----------------------------------------------------------------
 
 generatePrivateKey :: Curve -> IO Integer
 generatePrivateKey (Curve _ _ _ _ n) = do
@@ -185,12 +185,8 @@ generatePrivateKey (Curve _ _ _ _ n) = do
 byteStringToInt :: ByteString -> Int
 byteStringToInt bs = BS.foldl' (\acc b -> acc * 256 + fromIntegral b) 0 bs
 
-
-
-
 calculatePublicKey :: Curve -> Integer -> Point
 calculatePublicKey curve@(Curve _ _ _ g _) privateKey = multiply curve privateKey g
-
 
 generateKeyPair :: Curve -> IO (Integer, Point)
 generateKeyPair curve = do
@@ -205,9 +201,9 @@ sharedSecret curve privateKey otherPublicKey =
     Point x _ -> x
     Infinity  -> error "Infinity point in shared secret"
 
---------------------------------------------------------------------------------
---                                    Tests                                   --
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+--                           Tests                            --
+----------------------------------------------------------------
 
 
 main1 :: IO ()
@@ -219,7 +215,6 @@ main1 = do
 
 tests :: Test
 tests = TestList [additionTests, doublingTests, multiplicationTests, diffieHellmanTests]
-
 
 
 additionTests :: Test
@@ -331,11 +326,8 @@ multiplicationTests = TestLabel "MultiplicationTests" $ TestCase $ do
     fst (x, _, _, _, _) = x
     snd (_, y, _, _, _) = y
 
-
-
 diffieHellmanTests :: Test
 diffieHellmanTests = TestLabel "diffieHellmanTests" $ TestCase $ do
   let privateKey = 35905403542607215384985935828821254577671082484415297875889446736400999307980
   let Just otherPublicKey = integerToPublicKey 0x04b690499a4fdf5dac38ca27ee491f3113c049ed4e2283bd75c07d058a173a44c203973d75eb7fbcc594dd5fa6f6c101c03500ebc82518f5d9b32ca5cd91937194
   assertEqual "Shared secret" (sharedSecret_Secp256k1 privateKey otherPublicKey) 52152736907807189924485505447243568900722029942957802697517436635743252819877
-

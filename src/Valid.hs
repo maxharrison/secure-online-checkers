@@ -10,14 +10,11 @@ import Debug.Trace
 import GameState
 
 
-
-
---------------------------------------------------------------------------------
---                           Validation Function                              --
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+--                    Validation Function                     --
+----------------------------------------------------------------
 
 single x = [x]
-
 
 -- From the routes, only return the ones that they are allowed to take
 -- For example, if a jump can be taken, they have to take a jump
@@ -26,7 +23,8 @@ longest rs = let l = maximum $ map routeLength rs
              in filter (\r -> routeLength r == l) rs
 
 routeLength :: Route -> Int
-routeLength r = case length r of
+routeLength r =
+  case length r of
     0 -> 0
     1 -> 0
     2 -> if (diagonalDistance (r!!0) (r!!1) == 2)
@@ -34,18 +32,14 @@ routeLength r = case length r of
          else 1
     l -> l
 
-
 getAllValidBoardsRoutes :: Board -> Player -> [(Board, Route)]
 getAllValidBoardsRoutes board player
-    | won board /= Nothing = []
+    | countAllPieces board == 0 = []
     | otherwise = map (\r ->
         case validRoute True board player r of
             Just board' -> (board', r)
             Nothing -> error "This should never happen"
         ) $ validRoutes board player
-
-
-
 
 validRoutes :: Board -> Player -> [(Route)]
 validRoutes board player =
@@ -55,40 +49,59 @@ validRoutes board player =
     in longest routes
     
 
+-- The 'generateValidRoute' function generates all valid routes for a
+-- given player and an initial route on the board.
 generateValidRoute :: Board -> Player -> Route -> [(Route)]
 generateValidRoute board player route =
+      -- Generate a list of potential routes by appending each position from 'getAllPositions' to the initial route
     let routes = [route ++ [destination] | destination <- getAllPositions]
+
+        -- Filter out the invalid routes using the 'validRoute' function
         validRoutes = mapMaybe (\r ->
             case validRoute True board player r of
+                -- If the route is valid, return the route wrapped in a 'Just' value
                 Just board' -> Just (r)
+                -- If the route is not valid, return 'Nothing'
                 Nothing -> Nothing) routes
-        
 
-
-            --case validRoute True board player r of
-            --    Just board' -> Just (r)
-            --    Nothing -> Nothing) routes
-
+    -- If there are any valid routes, recursively call the function for
+    -- each valid route and concatenate the results
     in if length validRoutes > 0
         then concatMap (generateValidRoute board player) validRoutes
+        -- If the length of the initial route is greater than 1 and there are no valid routes
+        -- to extend it, return a list containing the initial route
         else if length route > 1
                 then [route]
+                -- If the length of the initial route is not greater than 1 and there are no valid
+                -- routes to extend it, return an empty list
                 else []
-
-
-
-
 
 
 type IsFirstMove = Bool
 
-validRoute :: IsFirstMove -> Board -> Player -> Route -> Maybe (Board)
+-- The 'validRoute' function checks if a given route is valid for a player to move their piece
+-- on the board. If the move is valid, it returns the updated board after making the move;
+-- otherwise, it returns Nothing.
+validRoute :: IsFirstMove -- ^ A 'Bool' indicating whether it's the first move in a game.
+           -> Board       -- ^ The board state.
+           -> Player      -- ^ The current player.
+           -> Route       -- ^ A list of coordinates.
+           -> Maybe (Board)
 validRoute isFirstMove board player (origin:destination:route) =
 
+    -- Check if the distance between the origin and destination is 2 (i.e., a jump move)
     let isDistance2 = diagonalDistance origin destination == 2
 
+        -- Calculate the middle position between the origin and destination
         middle = getMiddle origin destination
 
+        -- Check if the basic conditions for a valid move are satisfied:
+        -- 1. The piece at the origin belongs to the current player
+        -- 2. The origin and destination are within the board bounds
+        -- 3. The destination position is empty
+        -- 4. The piece is moving in the correct direction
+        -- 5. The piece is moving the correct distance for its first move
+        -- 6. If it's a jump move, the piece in the middle belongs to the opponent
         validBasic = validOwnPiece board player origin
                   && validInBounds origin destination
                   && validPositionEmpty board destination
@@ -96,27 +109,29 @@ validRoute isFirstMove board player (origin:destination:route) =
                   && validCorrectDistance isFirstMove origin destination
                   && validJump isDistance2 board player middle
 
+        -- Calculate the new board state after making the move
         newBoard = makeMove board player origin destination middle isDistance2
         
     in case (isDistance2, validBasic) of
 
+            -- If the basic conditions are not met, the move is invalid
             (_, False) -> Nothing
             
+            -- If it's not a jump move and the route is empty, the move is valid
             (False, _) -> if null route
-                                then return newBoard
-                                else Nothing
+                            then return newBoard
+                            else Nothing
 
+            -- If it's a jump move and the route is empty, the move is valid;
+            -- otherwise, continue checking the next move in the route
             (True, _)  -> if null route
-                                then return newBoard
-                                else validRoute False newBoard player (destination:route)
+                            then return newBoard
+                            else validRoute False newBoard player (destination:route)
 
 
-
-
---------------------------------------------------------------------------------
---                        Validation Helper Functions                         --
---------------------------------------------------------------------------------
-
+----------------------------------------------------------------
+--                Validation Helper Functions                 --
+----------------------------------------------------------------
 
 validInBounds :: Position -> Position -> Bool
 validInBounds (xo, yo) (xd, yd) =
@@ -143,7 +158,6 @@ validCorrectDistance isFirstMove origin destination
                      diagonalDistance origin destination == 2)
     | otherwise = diagonalDistance origin destination == 2
 
-
 -- if the user is jumping then is the position in the
 -- middle an oppponent piece
 validJump :: Bool -> Board -> Player -> Position -> Bool
@@ -152,7 +166,6 @@ validJump isDistance2 board player middle
         Just (p, _) -> p == next player
         _           -> False
     | otherwise = True
-
 
 validMovingCorrectly :: Board -> Position -> Position -> Bool
 validMovingCorrectly board (xo, yo) (xd, yd) =
@@ -168,9 +181,9 @@ validMovingCorrectly board (xo, yo) (xd, yd) =
         else False
 
 
---------------------------------------------------------------------------------
---                          General Helper Functions                          --
---------------------------------------------------------------------------------
+----------------------------------------------------------------
+--                  General Helper Functions                  --
+----------------------------------------------------------------
 
 makeMove :: Board -> Player -> Position -> Position -> Position -> Bool -> Board
 makeMove board player origin destination middle isDistance2 =
@@ -181,8 +194,6 @@ makeMove board player origin destination middle isDistance2 =
                 else originPiece
         board' = (Map.delete origin . Map.insert destination piece) board
     in if isDistance2 then Map.delete middle board' else board'
-
-
 
 diagonalDistance :: Position -> Position -> Int
 diagonalDistance (x1, y1) (x2, y2) = max (abs (x1 - x2)) (abs (y1 - y2))
@@ -197,14 +208,11 @@ next :: Player -> Player
 next White = Black
 next Black = White
 
-won :: Board -> Maybe Player
-won board =
+countAllPieces :: Board -> Int
+countAllPieces board =
     let whitePieces = countPlayerPieces board White
         blackPieces = countPlayerPieces board Black
-    in case (whitePieces, blackPieces) of
-        (0, _) -> Just Black
-        (_, 0) -> Just White
-        _      -> Nothing
+    in whitePieces + blackPieces
 
 countPlayerPieces :: Board -> Player -> Int
 countPlayerPieces board player =

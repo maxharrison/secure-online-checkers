@@ -1,15 +1,11 @@
 module Parsers where
-{-
-Inspiration from:
+{- Inspiration from:
     Programming in Haskell, Graham Hutton, Cambridge University Press, 2016.
-    COMP3012 Compilers module taught by Venanzio Capretta, University of Nottingham, 2022.
--}
+    COMP3012 Compilers module taught by Venanzio Capretta, University of Nottingham, 2022. -}
 
 -- Haskell modules
 import Control.Applicative (Alternative, (<|>), empty, some, many)
 import Data.Char (isDigit, isLetter, isAlphaNum, isSpace, digitToInt, toUpper, ord)
-
-
 
 -- My modules
 import GameState
@@ -103,10 +99,7 @@ someSeperator p s = do
     <|> do x <- p
            return [x]
 
-
-
 -----------------
-
 
 charToInt :: Char -> Int
 charToInt c = (ord $ toUpper c) - 65

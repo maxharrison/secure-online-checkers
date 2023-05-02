@@ -7,25 +7,19 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Control.Concurrent.MVar as MV
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Char8 as C8BS
-import Network.HTTP.Types.Status (badRequest400)
-import Debug.Trace
+import Network.HTTP.Types.Status (badRequest400, ok200)
 import Control.Applicative ((<|>))
-import qualified Data.ByteString.Lazy.Char8 as LBSC8
-import Data.Bits (testBit, shiftR, (.&.))
-
+import qualified Data.ByteString as BS
+import Data.Bits (shiftR, (.&.))
+import Data.Maybe (fromJust)
 
 -- My modules
 import GameState
 import Parsers
 import Valid
 import AI
-import DES_bits
+import DES
 import ECDH
-
-import qualified DES as D
-import qualified Binary as B
-
-
 
 -- run instructions in README.md
 
@@ -33,9 +27,10 @@ import qualified Binary as B
 --                    Command Type and Parser                 --
 ----------------------------------------------------------------
 
+
 type ID = String
 type AI = Bool
-data Command = Poll ID | Start ID AI Point | Move ID Route
+data Command = Poll ID Nonce | Start ID AI Point | Move ID Route
     deriving (Eq, Show)
 
   
@@ -44,7 +39,8 @@ commandParser = do
     stringToken "poll"
     space
     id <- ident
-    return (Poll id)
+    nonce <- nonceParser
+    return (Poll id nonce)
     <|> do 
         stringToken "start"
         space
@@ -60,20 +56,17 @@ commandParser = do
         return (Move id route)
 
 
+nonceParser :: Parser Word
+nonceParser = token $ do
+  nonce <- natural
+  return $ fromIntegral nonce
+
+
 publicKeyParser :: Parser Point
 publicKeyParser = token $ do
   number <- natural
-  let Just publicKey = integerToPublicKey number
-  return $ publicKey
+  return $ fromJust $ integerToPublicKey number
 
-
-{- boolParser :: Parser Bool
-boolParser = trueParser <|> falseParser
-
-trueParser :: Parser Bool
-trueParser = do
-  stringToken "True"
-  return True -}
 
 parseCommand :: String -> Maybe Command
 parseCommand s =
@@ -81,29 +74,50 @@ parseCommand s =
     [(c, "")] -> Just c
     _         -> Nothing
 
+
+
 --------------------------------------------------------------------------------
---                               Start Function                               --
+--                               Key Exhcnage                                 --
 --------------------------------------------------------------------------------
 
 
 derive64BitKey :: Integer -> Word
 derive64BitKey n = fromIntegral $ n .&. 0xFFFFFFFFFFFFFFFF
 
+
 ecdh :: MV.MVar GameState -> Point -> S.ActionM Word
 ecdh gameStateVar otherPublicKey = do
-  (privateKey, publicKey) <- liftIO generateKeyPair_Secp256k1
+  -- Generate the public and private keys
+  (privateKey, Point x y) <- liftIO generateKeyPair_Secp256k1
+
+  -- send the public key
+  let publicKeyBytes = BS.concat [BS.singleton 4, intToBS x, intToBS y]
+  sendData publicKeyBytes
+
+  -- calculate the shared secret and derive the key
   let shared_secret = sharedSecret_Secp256k1 privateKey otherPublicKey
-  S.setHeader "Content-Type" "application/octet-stream"
-  S.raw $ LBS.fromStrict $ C8BS.pack $ show $ publicKeyToInteger publicKey
-  liftIO $ putStrLn $ "SS: " ++ show shared_secret
   let key = derive64BitKey shared_secret
   return key
 
 
+-- This function is explained backwards because of how it is written.
+-- fmap is used to right shift each number in the list by n. This list is
+-- from 248 to zero in 8 step decrements - this means there are 32 items.
+-- Then each item in the list is masked with 255. Then finally, BS.pack
+-- takes 32 integer values and converts them to a bytestring.
+intToBS :: Integer -> BS.ByteString
+intToBS n = BS.pack $
+  fmap (fromInteger . (255 .&.)) $
+  fmap (shiftR n) [248, 240 .. 0]
 
 
--- Comments written by GPT
--- | 'start' initializes a new game session based on the input parameters.
+
+--------------------------------------------------------------------------------
+--                               Start Function                               --
+--------------------------------------------------------------------------------
+
+
+-- | 'start' initialises a new game session based on the input parameters.
 -- If AI = True, it assigns the 'id' to the white player and AI to black player.
 -- If AI = False, it assigns the 'id' to the first available player slot.
 start :: MV.MVar GameState -- ^ The GameState MVar holding the current state
@@ -127,8 +141,9 @@ start gameStateVar id True otherPublicKey = do
         blackID = Just "AI",
         ai = True,
         started = True})
+      
     -- Send a bad request response if white player is already set.
-    else S.status badRequest400
+    else sendInvalid
 
 
 -- Without AI - i.e. multiplayer
@@ -157,16 +172,7 @@ start gameStateVar id False otherPublicKey = do
         started = True})
 
     -- Send a bad request response if both player slots are already filled.
-    _ -> S.status badRequest400
-
-
-
-
-
-
-
-
-
+    _ -> sendInvalid
 
 
 
@@ -175,18 +181,40 @@ start gameStateVar id False otherPublicKey = do
 --------------------------------------------------------------------------------
 
 
+won :: Board -> String
+won board =
+  let whiteMoves = getAllValidBoardsRoutes board White
+      blackMoves = getAllValidBoardsRoutes board Black
+  in case (whiteMoves, blackMoves) of
+    ([], []) -> "D" -- Draw
+    ([], _)  -> "B" -- Black wins
+    (_, [])  -> "W" -- White wins
+    _        -> "P" -- Still playing
+
+
+sendGameOver :: S.ActionM ()
+sendGameOver = do
+  liftIO $ putStrLn "Game Over"
+  sendData "Game Over"
+  
+
+sendInvalid :: S.ActionM ()
+sendInvalid = do
+  liftIO $ putStrLn "Invalid"
+  S.status badRequest400
+
+
 nextPlayer :: MV.MVar GameState -> S.ActionM ()
 nextPlayer gameStateVar = do
   currentPlayer <- liftIO $ GameState.currentPlayer <$> MV.readMVar gameStateVar 
   liftIO $ MV.modifyMVar_ gameStateVar (\gs -> return gs {
-    currentPlayer = if currentPlayer == White then Black else White
-    })
+    currentPlayer = if currentPlayer == White then Black else White})
+
 
 updateBoard :: MV.MVar GameState -> Board -> S.ActionM ()
 updateBoard gameStateVar board = do
   liftIO $ MV.modifyMVar_ gameStateVar (\gs -> return gs {
-    board = board
-    })
+    board = board})
 
 
 moveAI :: MV.MVar GameState -> S.ActionM ()
@@ -195,12 +223,9 @@ moveAI gameStateVar = do
   case (best_move 3 score_count board Black) of
     Just (newBoard, _, _) -> do
       updateBoard gameStateVar newBoard
-      sendBoard gameStateVar White
-    Nothing            -> liftIO $ putStrLn "NO POSSIBLE MOVES: GAME ENDED"
+    Nothing               -> liftIO $ putStrLn "NO POSSIBLE MOVES: GAME ENDED"
 
 
-
--- Comments written by GPT
 -- | This function manages a move in a client-server checkers game. It first
 -- retrieves the current board and player from the GameState. Then, it checks if
 -- the move is valid. If valid, it updates the board, sends the board to the
@@ -218,9 +243,6 @@ move gameStateVar player route = do
   -- Get all valid routes for the current player
   let routes = getAllValidBoardsRoutes board currentPlayer
 
-  -- Check if AI is enabled
-  ai <- liftIO $ GameState.ai <$> MV.readMVar gameStateVar
-
   -- Check if the move is valid
   if route `elem` (map snd routes)
     then do
@@ -228,10 +250,11 @@ move gameStateVar player route = do
       let newBoard = fst $ head $ filter (\(_, r) -> r == route) routes
       updateBoard gameStateVar newBoard
 
-      -- Send the updated board to the client
-      sendBoard gameStateVar currentPlayer
+      -- Send the status
+      S.status ok200
 
       -- Proceed with either an AI move or the next player's move
+      ai <- liftIO $ GameState.ai <$> MV.readMVar gameStateVar
       if ai
         then moveAI gameStateVar
         else nextPlayer gameStateVar
@@ -239,7 +262,7 @@ move gameStateVar player route = do
     else do
       -- If the move is invalid, print a message and return a "Bad Request"
       liftIO $ putStrLn "Invalid move"
-      S.status badRequest400
+      sendInvalid
 
   
 -- | This function tries to indentify a player from the ID given
@@ -253,6 +276,7 @@ identify gameStateVar id = do
     else if Just id == blackID then Just Black
       else Nothing
 
+
 -- | This function says whether a player given is the current player
 checkCurrentPlayer :: MV.MVar GameState -> Maybe Player -> S.ActionM (Bool)
 checkCurrentPlayer gameStateVar maybePlayer = do
@@ -265,32 +289,34 @@ checkCurrentPlayer gameStateVar maybePlayer = do
 --                  Sending and Encryption                    --
 ----------------------------------------------------------------
 
-poll :: MV.MVar GameState -> Player -> S.ActionM ()
-poll gameStateVar player = do
-  board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
-  S.setHeader "Content-Type" "application/octet-stream"
-  case ((length $ getAllValidBoardsRoutes board White), (length $ getAllValidBoardsRoutes board Black)) of
-        (0, 0) -> S.raw $ LBS.fromStrict $ C8BS.pack "draw"
-        (0, _) -> S.raw $ LBS.fromStrict $ C8BS.pack "black wins"
-        (_, 0) -> S.raw $ LBS.fromStrict $ C8BS.pack "white wins"
-        _      -> sendBoard gameStateVar player
 
-sendBoard :: MV.MVar GameState -> Player -> S.ActionM ()
-sendBoard gameStateVar player = do
+poll :: MV.MVar GameState -> Player -> Nonce -> S.ActionM ()
+poll gameStateVar player nonce = do
+  board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
+  sendBoard gameStateVar player nonce
+
+
+sendBoard :: MV.MVar GameState -> Player -> Nonce -> S.ActionM ()
+sendBoard gameStateVar player nonce = do
   board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
   currentPlayer <- liftIO $ GameState.currentPlayer <$> MV.readMVar gameStateVar
-  sendData gameStateVar player $ showFullBoard board currentPlayer
+  let winner = " " ++ won board ++ " "
+  let string = show player ++ winner ++ showFullBoard board currentPlayer
+  sendEncryptedData gameStateVar player string nonce
 
-sendData :: MV.MVar GameState -> Player -> String -> S.ActionM ()
-sendData gameStateVar player string = do
+
+sendEncryptedData :: MV.MVar GameState -> Player -> String -> Nonce -> S.ActionM ()
+sendEncryptedData gameStateVar player string nonce = do
   let playerKey = if player == White then GameState.whiteKey else GameState.blackKey
   key <- liftIO $ playerKey <$> MV.readMVar gameStateVar
-  liftIO $ putStrLn $ showBinary key
-  let nonce = 0
   let ciphertext = encrypt key nonce (stringToBytes string)
-  let ciphertextString = showBytes ciphertext
-  S.setHeader "Content-Type" "application/octet-stream"
-  S.raw $ LBS.fromStrict $ C8BS.pack ciphertextString
+  let ciphertextByteString = BS.pack $ map fromIntegral ciphertext
+  sendData ciphertextByteString
+
+
+sendData :: BS.ByteString -> S.ActionM ()
+sendData = S.raw . LBS.fromStrict
+
 
 
 ----------------------------------------------------------------
@@ -303,7 +329,7 @@ main = do
 
   -- initialise the state mvar
   gameStateVar <- MV.newMVar GameState {
-    board = smallBoard,
+    board = startBoard,
     currentPlayer = White,
     started = False,
     whiteID = Nothing,
@@ -316,25 +342,21 @@ main = do
   -- start the web server
   S.scotty 3000 $ do
 
-    --S.get "/binary" $ do
-    --  sendBoard gameStateVar      
-
     -- curl -X POST -H "Content-Type: application/octet-stream" --data-binary $'poll' localhost:3000/binary
     S.post "/binary" $ do
       body <- S.body
-      --liftIO $ putStrLn $ "body: " ++ show body
 
       case parseCommand $ C8BS.unpack (LBS.toStrict body) of
 
         -- invalid command
-        Nothing -> S.status badRequest400
+        Nothing -> sendInvalid
 
         -- poll
-        Just (Poll id) -> do
+        Just (Poll id nonce) -> do
           player <- identify gameStateVar id
           case player of
-            Nothing -> S.status badRequest400
-            Just p -> poll gameStateVar p
+            Nothing -> sendInvalid
+            Just p -> poll gameStateVar p nonce
 
         -- start
         Just (Start id ai otherPublicKey) -> start gameStateVar id ai otherPublicKey
@@ -346,9 +368,4 @@ main = do
           checkCurrentPlayer <- checkCurrentPlayer gameStateVar playerWhoIsConnected
           case (checkStarted, playerWhoIsConnected, checkCurrentPlayer) of
             (True, Just p, True)  -> move gameStateVar p route
-            otherwise             -> S.status badRequest400
-
-
-
-
-
+            otherwise             -> sendInvalid
