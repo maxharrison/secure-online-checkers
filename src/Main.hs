@@ -220,7 +220,7 @@ updateBoard gameStateVar board = do
 moveAI :: MV.MVar GameState -> S.ActionM ()
 moveAI gameStateVar = do
   board <- liftIO $ GameState.board <$> MV.readMVar gameStateVar
-  case (best_move 3 score_count board Black) of
+  case (best_move 6 score_count board Black) of
     Just (newBoard, _, _) -> do
       updateBoard gameStateVar newBoard
     Nothing               -> liftIO $ putStrLn "NO POSSIBLE MOVES: GAME ENDED"

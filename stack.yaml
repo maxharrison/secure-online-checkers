@@ -67,3 +67,8 @@ packages: []
 
 packages:
 - .
+
+
+ghc-options:
+  "$locals": -O2
+

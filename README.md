@@ -18,9 +18,23 @@ This user manual will guide you through the process of setting up and running th
 - Download the zip file of the program adn extract the contents to your desired location.
 - Open a terminal or command prompt and navigate to the extracted folder.
 - Run the following command to install the required Python packages: `pip install -r requirements.txt`.
+  - pygame 2.1.3
+  - requests 2.28.2
+  - pycryptodome 3.17
+  - cryptography 3.4.8
 
 ### Running the Server
 To start the server, run the provided executable file. Open a terminal, navigate to the server folder, and run `./secure_online_checkers_server`.
+
+### Running the Server from source
+If you want to run the server from source, you need to use GHC. The Haskell packages required are the following from the packages.yaml:
+- HUnit
+- random
+- entropy
+- bytestring
+- containers
+- scotty
+- http-types
 
 ### Running the Python GUI Client
 - Once the server is up and running, open another terminal or command prompt and navigate to the src folder. This can be done on the same computer that the server is running, or if on the same network the zip can be downloaded seperately.

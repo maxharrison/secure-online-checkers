@@ -43,6 +43,7 @@ class Checkers:
     self.player = ""
     self.nonce = b''
     self.key = self.start_game()
+    print(self.key.hex())
 
 
     # Game window
@@ -164,7 +165,7 @@ class Checkers:
       if square != self.route[-1]:
         data += ','
     print(data)
-    r = requests.post('http://localhost:3000/binary', data=data)
+    r = requests.post(f'http://{self.ip}:3000/binary', data=data)
 
   def route_string(self):
     route = ""
@@ -253,7 +254,7 @@ class Checkers:
     self.nonce = secrets.token_bytes(4)
     nonceNumber = int.from_bytes(self.nonce, 'big')
     try:
-      r = requests.post('http://localhost:3000/binary', data=f'poll {self.id} {nonceNumber}', headers={'Content-Type': 'text/plain'})
+      r = requests.post(f'http://{self.ip}:3000/binary', data=f'poll {self.id} {nonceNumber}', headers={'Content-Type': 'text/plain'})
       plaintext = self.decryptDES(r.content)
       board = self.parse_board(plaintext)
       return board
